@@ -8,7 +8,7 @@ namespace TimeTracker.Tests;
 public class RingAndStreakTests
 {
     [Fact]
-    public void Overview_draws_work_goal_remainder_and_daily_remainder()
+    public void Overview_cuts_project_work_then_project_target_then_daily_remainder()
     {
         var alpha = new Project { Id = "a", Name = "Alpha", Color = "#3B82F6", DailyGoalHours = 4 };
         var beta = new Project { Id = "b", Name = "Beta", Color = "#F59E0B", DailyGoalHours = 3 };
@@ -23,9 +23,16 @@ public class RingAndStreakTests
         var segments = DailyRingBuilder.BuildOverview([alpha, beta, gamma], slices, dailyGoalHours: 12);
 
         Assert.Equal(
-            [("Alpha", 5 * 3600d), ("Beta", 3600d), ("Beta remained", 2 * 3600d), ("Gamma", 2 * 3600d), ("remained daily", 2 * 3600d)],
-            segments.Select(segment => (segment.Label, segment.Seconds)).ToArray());
+            [
+                ("Alpha", "#3B82F6", 5 * 3600d),
+                ("Beta", "#F59E0B", 3600d),
+                ("", DailyRingBuilder.ProjectRemainHex, 2 * 3600d),
+                ("Gamma", "#2EE59D", 2 * 3600d),
+                ("", DailyRingBuilder.DailyRemainHex, 2 * 3600d)
+            ],
+            segments.Select(segment => (segment.Label, segment.StrokeHex, segment.Seconds)).ToArray());
         Assert.Equal(12 * 3600d, segments.Sum(segment => segment.Seconds), 0.1);
+        Assert.DoesNotContain(segments, segment => segment.Label.Contains("remained", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -47,7 +54,9 @@ public class RingAndStreakTests
     {
         var project = new Project { Id = "a", Name = "Alpha", Color = "#3B82F6" };
         var segments = DailyRingBuilder.BuildOverview([project], [Slice("a", 2 * 3600)], 12);
-        Assert.Equal(["Alpha", "remained daily"], segments.Select(segment => segment.Label).ToArray());
+        Assert.Equal(["Alpha", ""], segments.Select(segment => segment.Label).ToArray());
+        Assert.Equal(DailyRingBuilder.DailyRemainHex, segments[1].StrokeHex);
+        Assert.DoesNotContain(segments, segment => segment.Label.Contains("remained", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

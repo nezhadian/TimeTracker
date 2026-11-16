@@ -11,12 +11,10 @@ static class TickMarkPainter
     public const int Count = 24;
     public const string IdleHex = "#E6E8EB";
     public const string ElapsedHex = "#5B8EBF";
-    public const string CircleHex = "#E8E8E8";
 
     public static void Draw(Canvas surface, Point center, double size, IReadOnlyList<string> colors)
     {
         var (inner, outer, thickness) = Metrics(size);
-        AddCircle(surface, center, inner, CircleHex, 1.4);
 
         for (var i = 0; i < Count; i++)
         {
@@ -57,19 +55,4 @@ static class TickMarkPainter
 
     public static Point OnCircle(Point center, double radius, double angle)
         => new(center.X + radius * Math.Cos(angle), center.Y + radius * Math.Sin(angle));
-
-    static void AddCircle(Canvas surface, Point center, double radius, string hex, double thickness)
-    {
-        var circle = new Ellipse
-        {
-            Width = radius * 2,
-            Height = radius * 2,
-            Stroke = ColorUtil.ToBrush(hex),
-            StrokeThickness = thickness,
-            Fill = null
-        };
-        surface.Children.Add(circle);
-        Canvas.SetLeft(circle, center.X - radius);
-        Canvas.SetTop(circle, center.Y - radius);
-    }
 }

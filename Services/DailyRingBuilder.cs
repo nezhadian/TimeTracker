@@ -5,9 +5,10 @@ namespace TimeTracker.Services;
 public static class DailyRingBuilder
 {
     public const string RemainedDailyLabel = "remained daily";
+    public const string ProjectRemainHex = "#D1D5DB";
+    public const string DailyRemainHex = "#6B7280";
     const string LightGray = "#E5E7EB";
     const string LightLabel = "#6B7280";
-    const string DarkGray = "#4B5563";
 
     public static IReadOnlyList<RingSegment> BuildOverview(
         IReadOnlyList<Project> projects,
@@ -19,8 +20,8 @@ public static class DailyRingBuilder
             .ToDictionary(group => group.Key, group => group.Sum(slice => (double)slice.Seconds));
 
         var segments = new List<RingSegment>();
-        double used = 0;
         var seen = new HashSet<string>();
+        double used = 0;
 
         foreach (var project in projects)
         {
@@ -33,8 +34,8 @@ public static class DailyRingBuilder
                     segments.Add(ProjectArc(project.Name, project.Color, seconds));
                 var gray = Math.Max(0, goalSeconds - seconds);
                 if (gray > 0)
-                    segments.Add(RemainderArc($"{project.Name} remained", gray));
-                used += seconds + gray;
+                    segments.Add(new RingSegment("", ProjectRemainHex, gray, LightLabel, false));
+                used += Math.Max(seconds, goalSeconds);
             }
             else if (seconds > 0)
             {
@@ -53,9 +54,9 @@ public static class DailyRingBuilder
             used += seconds;
         }
 
-        var remained = Math.Max(0, dailyGoalHours * 3600d - used);
-        if (remained > 0)
-            segments.Add(new RingSegment(RemainedDailyLabel, DarkGray, remained, DarkGray, true));
+        var rest = Math.Max(0, dailyGoalHours * 3600d - used);
+        if (rest > 0)
+            segments.Add(new RingSegment("", DailyRemainHex, rest, DailyRemainHex, false));
 
         return segments;
     }
@@ -90,7 +91,4 @@ public static class DailyRingBuilder
 
     static RingSegment ProjectArc(string name, string color, double seconds)
         => new(name, color, seconds, color, true);
-
-    static RingSegment RemainderArc(string label, double seconds)
-        => new(label, LightGray, seconds, LightLabel, true);
 }
