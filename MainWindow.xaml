@@ -68,21 +68,24 @@
                   </StackPanel>
                 </Grid>
 
-                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,18">
-                  <Button Margin="0,0,12,0"
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" Margin="0,8,0,18">
+                  <Button Style="{StaticResource FocusCtaButton}"
+                          Margin="0,0,12,0"
                           Command="{Binding ToggleSessionCommand}" IsEnabled="{Binding CanToggleSession}"
                           ToolTipService.ToolTip="{Binding PrimaryToolTip}"
                           AutomationProperties.Name="{Binding PrimaryToolTip}">
-                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="{Binding PrimaryGlyph}" FontSize="18"/>
+                    <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="{Binding PrimaryGlyph}" FontSize="20"/>
                   </Button>
-                  <Button Margin="0,0,12,0"
+                  <Button Margin="0,0,12,0" VerticalAlignment="Center"
                           Command="{Binding EndSessionCommand}"
                           Visibility="{Binding ShowResetButton, Converter={StaticResource BoolVis}}"
                           ToolTipService.ToolTip="Reset session"
                           AutomationProperties.Name="Reset session">
                     <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72C;" FontSize="16"/>
                   </Button>
-                  <Button ToolTipService.ToolTip="More" AutomationProperties.Name="More">
+                  <Button VerticalAlignment="Center"
+                          ToolTipService.ToolTip="More" AutomationProperties.Name="More">
                     <Button.Flyout>
                       <MenuFlyout>
                         <MenuFlyoutItem Text="End session" Click="EndSession_Click"/>

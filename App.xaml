@@ -12,6 +12,16 @@
       <conv:HexToBrushConverter x:Key="HexBrush"/>
       <conv:BoolToVisibilityConverter x:Key="BoolVis"/>
       <conv:BoolToVisibilityConverter x:Key="BoolVisInvert" Invert="True"/>
+      <Style x:Key="FocusCtaButton" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+        <Setter Property="Width" Value="36"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="MinWidth" Value="36"/>
+        <Setter Property="MinHeight" Value="36"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="CornerRadius" Value="24"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+      </Style>
     </ResourceDictionary>
   </Application.Resources>
 </Application>
