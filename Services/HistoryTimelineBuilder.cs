@@ -13,7 +13,12 @@ public static class HistoryTimelineBuilder
         if (!DateOnly.TryParse(day.Date, out var date))
             date = TimeMath.LocalDate(now);
 
-        var events = BuildEvents(day, now);
+        var chronological = BuildEvents(day, now);
+        var events = chronological
+            .OrderByDescending(item => item.Start)
+            .ThenByDescending(item => item.Kind)
+            .ThenByDescending(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
         var projects = events
             .Where(item => item.Kind == HistoryEventKind.Work)
             .GroupBy(item => (item.ProjectId, item.Title, item.Color))
@@ -41,7 +46,7 @@ public static class HistoryTimelineBuilder
             SummaryText = $"{TimeMath.FormatShort(work)} worked · {TimeMath.FormatShort(stopped)} stopped",
             Events = events,
             Projects = projects,
-            BarSegments = BuildBar(events, date, now)
+            BarSegments = BuildBar(chronological, date, now)
         };
     }
 

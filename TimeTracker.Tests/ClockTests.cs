@@ -383,6 +383,7 @@ public class ClockTests : IDisposable
         Assert.Equal("Default", project.Name);
         Assert.Equal("#2EE59D", project.Color);
         Assert.Null(project.DailyGoalHours);
+        Assert.Equal(40, project.SessionLengthMinutes);
         Assert.Equal(40, store.Settings.SessionLengthMinutes);
         Assert.Equal(3, store.Settings.ReasonThresholdMinutes);
         Assert.Equal(12, store.Settings.DailyGoalHours);

@@ -13,14 +13,9 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="8">
         <StackPanel x:Name="GeneralSettings" Spacing="8">
-          <TextBlock Text="Session length (minutes)" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-          <TextBox Text="{Binding SessionLengthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-          <TextBlock Text="The next session uses this length. A session already running keeps the length it started with."
-                     Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap"/>
-
-          <TextBlock Text="Reason threshold (minutes)" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-          <TextBox Text="{Binding ReasonThresholdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-          <TextBlock Text="Resume and session end ask why you stopped only when the stop is longer than this. Changing project brings elapsed time without asking when focused time is not longer than this. Use 0 to ask after every stop."
+          <TextBlock Text="Time accuracy (minutes)" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+          <TextBox Text="{Binding TimeAccuracyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+          <TextBlock Text="The smallest gap treated as intentional. Resume and session end ask why you stopped only when the stop is longer than this. Changing project brings elapsed time over without asking when focused time is not longer than this. Use 0 to ask after every stop and every project change."
                      Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap"/>
 
           <TextBlock Text="Daily goal (hours)" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
@@ -41,7 +36,7 @@
 
         <StackPanel x:Name="ProjectSettings" Spacing="8" Margin="0,18,0,0">
           <TextBlock Text="Projects" Style="{ThemeResource SubtitleTextBlockStyle}"/>
-          <TextBlock Text="Leave a project's goal empty to count it only against the daily goal. At least one project stays."
+          <TextBlock Text="Focus minutes is the session length for that project. Leave a project's goal empty to count it only against the daily goal. At least one project stays."
                      Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap"/>
 
           <ItemsControl ItemsSource="{Binding Projects}">
@@ -50,9 +45,10 @@
                 <Grid Margin="0,0,0,8" ColumnSpacing="8">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="96"/>
+                    <ColumnDefinition Width="80"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="88"/>
+                    <ColumnDefinition Width="72"/>
+                    <ColumnDefinition Width="80"/>
                     <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
                   <Button Click="Swatch_Click" ToolTipService.ToolTip="Choose a color" MinWidth="32">
@@ -63,8 +59,14 @@
                   <TextBox Grid.Column="2"
                            Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTipService.ToolTip="Project name"/>
                   <TextBox Grid.Column="3"
-                           Text="{Binding GoalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTipService.ToolTip="Daily goal in hours, or empty"/>
-                  <Button Grid.Column="4" Content="Remove"
+                           Text="{Binding SessionLengthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           PlaceholderText="min"
+                           ToolTipService.ToolTip="Focus session length in minutes"/>
+                  <TextBox Grid.Column="4"
+                           Text="{Binding GoalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           PlaceholderText="goal h"
+                           ToolTipService.ToolTip="Daily goal in hours, or empty"/>
+                  <Button Grid.Column="5" Content="Remove"
                           Command="{Binding DataContext.RemoveProjectCommand, ElementName=Root}"
                           CommandParameter="{Binding}"/>
                 </Grid>

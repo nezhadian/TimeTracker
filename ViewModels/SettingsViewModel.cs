@@ -21,11 +21,16 @@ public partial class ProjectEdit : ObservableObject
     [ObservableProperty]
     private string _goalText = "";
 
+    [ObservableProperty]
+    private string _sessionLengthText = "40";
+
     public static ProjectEdit From(Project project) => new()
     {
         Id = project.Id,
         Name = project.Name,
         Color = project.Color,
+        SessionLengthText = (project.SessionLengthMinutes > 0 ? project.SessionLengthMinutes : 40)
+            .ToString(CultureInfo.CurrentCulture),
         GoalText = project.DailyGoalHours?.ToString("0.##", CultureInfo.CurrentCulture) ?? ""
     };
 }
@@ -40,8 +45,7 @@ public partial class SettingsViewModel : ObservableObject
         FirstRun = firstRun;
         ActiveProjectId = activeProjectId;
         var settings = store.Settings;
-        SessionLengthText = settings.SessionLengthMinutes.ToString(CultureInfo.CurrentCulture);
-        ReasonThresholdText = settings.ReasonThresholdMinutes.ToString(CultureInfo.CurrentCulture);
+        TimeAccuracyText = settings.ReasonThresholdMinutes.ToString(CultureInfo.CurrentCulture);
         DailyGoalText = settings.DailyGoalHours.ToString("0.##", CultureInfo.CurrentCulture);
         DataFolder = store.DataFolder ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -57,10 +61,7 @@ public partial class SettingsViewModel : ObservableObject
     public ObservableCollection<ProjectEdit> Projects { get; } = [];
 
     [ObservableProperty]
-    private string _sessionLengthText = "40";
-
-    [ObservableProperty]
-    private string _reasonThresholdText = "3";
+    private string _timeAccuracyText = "3";
 
     [ObservableProperty]
     private string _dailyGoalText = "12";
@@ -74,19 +75,11 @@ public partial class SettingsViewModel : ObservableObject
     public bool TrySave()
     {
         ErrorText = "";
-        if (!int.TryParse(SessionLengthText.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var sessionLength)
-            || sessionLength < 1
-            || sessionLength > 24 * 60)
-        {
-            ErrorText = "Session length needs to be a whole number of minutes, from 1 to 1440.";
-            return false;
-        }
-
-        if (!int.TryParse(ReasonThresholdText.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var threshold)
+        if (!int.TryParse(TimeAccuracyText.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var threshold)
             || threshold < 0
             || threshold > 24 * 60)
         {
-            ErrorText = "The reason threshold needs to be a whole number of minutes, from 0 up.";
+            ErrorText = "Time accuracy needs to be a whole number of minutes, from 0 up.";
             return false;
         }
 
@@ -105,7 +98,7 @@ public partial class SettingsViewModel : ObservableObject
         if (!TryBuildProjects(out var savedProjects))
             return false;
 
-        return Save(sessionLength, threshold, dailyGoal, DataFolder.Trim(), savedProjects);
+        return Save(_store.Settings.SessionLengthMinutes, threshold, dailyGoal, DataFolder.Trim(), savedProjects);
     }
 
     public bool TrySaveProjects()
@@ -147,6 +140,14 @@ public partial class SettingsViewModel : ObservableObject
                 return false;
             }
 
+            if (!int.TryParse(row.SessionLengthText.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var sessionLength)
+                || sessionLength < 1
+                || sessionLength > 24 * 60)
+            {
+                ErrorText = $"Focus minutes for {name} needs to be a whole number from 1 to 1440.";
+                return false;
+            }
+
             double? goal = null;
             if (!string.IsNullOrWhiteSpace(row.GoalText))
             {
@@ -164,6 +165,7 @@ public partial class SettingsViewModel : ObservableObject
                 Id = string.IsNullOrWhiteSpace(row.Id) ? Guid.NewGuid().ToString("D") : row.Id,
                 Name = name,
                 Color = color,
+                SessionLengthMinutes = sessionLength,
                 DailyGoalHours = goal
             });
         }
@@ -216,7 +218,8 @@ public partial class SettingsViewModel : ObservableObject
         Projects.Add(new ProjectEdit
         {
             Name = "Project " + (Projects.Count + 1),
-            Color = ColorUtil.Palette[Projects.Count % ColorUtil.Palette.Length]
+            Color = ColorUtil.Palette[Projects.Count % ColorUtil.Palette.Length],
+            SessionLengthText = "40"
         });
     }
 

@@ -208,7 +208,7 @@ public partial class MainViewModel : ObservableObject
             if (!await ResumeAsync(now))
                 return;
             if (_clock.State.Session is null)
-                _clock.StartSession(project, _store.Settings.SessionLengthMinutes * 60, DateTimeOffset.Now);
+                _clock.StartSession(project, SessionSeconds(project), DateTimeOffset.Now);
         }
         else if (_clock.IsBreakActive)
         {
@@ -216,7 +216,7 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
-            _clock.StartSession(project, _store.Settings.SessionLengthMinutes * 60, now);
+            _clock.StartSession(project, SessionSeconds(project), now);
         }
 
         Refresh();
@@ -265,12 +265,17 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    void StartLongBreak() => StartPresetBreak(20, "Long Break");
+
+    [RelayCommand]
+    void StartShortBreak() => StartPresetBreak(10, "Short Break");
+
+    [RelayCommand]
     void StartOrCancelBreak()
     {
-        var now = DateTimeOffset.Now;
         if (_clock.IsBreakActive)
         {
-            _clock.CancelBreak(now);
+            _clock.CancelBreak(DateTimeOffset.Now);
             Refresh();
             return;
         }
@@ -281,9 +286,17 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        StartPresetBreak(minutes, BreakReason);
+    }
+
+    void StartPresetBreak(int minutes, string reason)
+    {
+        if (_clock.IsBreakActive)
+            return;
+
         ErrorText = "";
-        _clock.StartBreak(minutes * 60, BreakReason, now);
-        _store.RememberBreakReason(BreakReason);
+        _clock.StartBreak(minutes * 60, reason, DateTimeOffset.Now);
+        _store.RememberBreakReason(reason);
         ReloadBreakReasons();
         Refresh();
     }
@@ -420,7 +433,7 @@ public partial class MainViewModel : ObservableObject
         if (_clock.TryResume(DateTimeOffset.Now, reason.Text, ThresholdSeconds, reason.Project) != ClockAction.Done)
             return;
         if (_clock.State.Session is null && SelectedProject is not null)
-            _clock.StartSession(SelectedProject, _store.Settings.SessionLengthMinutes * 60, DateTimeOffset.Now);
+            _clock.StartSession(SelectedProject, SessionSeconds(SelectedProject), DateTimeOffset.Now);
         Refresh();
     }
 
@@ -497,7 +510,7 @@ public partial class MainViewModel : ObservableObject
 
         if (session is null)
         {
-            RemainingText = TimeMath.FormatCountdown(settings.SessionLengthMinutes * 60L);
+            RemainingText = TimeMath.FormatCountdown(SessionSeconds(SelectedProject));
             ElapsedFraction = 0;
             SessionStatus = "";
             PrimaryGlyph = "\uE768";
@@ -879,6 +892,14 @@ public partial class MainViewModel : ObservableObject
     bool IsLive => _clock.State.Session is not null || _clock.State.Break is not null;
 
     int ThresholdSeconds => _store.Settings.ReasonThresholdMinutes * 60;
+
+    int SessionSeconds(Project? project)
+    {
+        var minutes = project?.SessionLengthMinutes > 0
+            ? project.SessionLengthMinutes
+            : _store.Settings.SessionLengthMinutes;
+        return Math.Max(1, minutes) * 60;
+    }
 }
 
 public partial class OverviewProjectItem : ObservableObject

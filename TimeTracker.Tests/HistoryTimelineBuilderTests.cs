@@ -38,14 +38,14 @@ public class HistoryTimelineBuilderTests
         var view = HistoryTimelineBuilder.Build(day, start.AddDays(1));
 
         Assert.Equal(4, view.Events.Count);
-        Assert.Equal(new[] { HistoryEventKind.Work, HistoryEventKind.Pause, HistoryEventKind.Work, HistoryEventKind.Break },
+        Assert.Equal(new[] { HistoryEventKind.Break, HistoryEventKind.Work, HistoryEventKind.Pause, HistoryEventKind.Work },
             view.Events.Select(item => item.Kind));
-        Assert.Equal("Alpha", view.Events[0].Title);
-        Assert.Equal("Pause", view.Events[1].Title);
-        Assert.Equal("phone", view.Events[1].Reason);
-        Assert.Equal("Beta", view.Events[2].Title);
-        Assert.Equal("Break", view.Events[3].Title);
-        Assert.Equal("lunch", view.Events[3].Reason);
+        Assert.Equal("Break", view.Events[0].Title);
+        Assert.Equal("lunch", view.Events[0].Reason);
+        Assert.Equal("Beta", view.Events[1].Title);
+        Assert.Equal("Pause", view.Events[2].Title);
+        Assert.Equal("phone", view.Events[2].Reason);
+        Assert.Equal("Alpha", view.Events[3].Title);
         Assert.Equal(2, view.Projects.Count);
         Assert.Equal("Alpha", view.Projects[0].Name);
         Assert.Equal(40 * 60, view.Projects[0].Seconds);

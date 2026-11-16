@@ -19,7 +19,8 @@ public sealed class TrackerSettings
                 {
                     Id = Guid.NewGuid().ToString("D"),
                     Name = "Default",
-                    Color = "#2EE59D"
+                    Color = "#2EE59D",
+                    SessionLengthMinutes = 40
                 }
             ]
         };

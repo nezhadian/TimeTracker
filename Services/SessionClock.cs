@@ -165,7 +165,7 @@ public sealed class SessionClock
         if (session is null)
             return;
 
-        var planned = session.PlannedSeconds;
+        var planned = project.SessionLengthMinutes > 0 ? project.SessionLengthMinutes * 60 : session.PlannedSeconds;
         var onBreak = IsBreakActive;
         if (session.SliceStart is not null)
             CloseOpenSlice(now);

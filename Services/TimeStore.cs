@@ -248,6 +248,8 @@ public sealed class TimeStore
             if (!ColorUtil.TryNormalize(project.Color, out var color))
                 color = "#2EE59D";
             project.Color = color;
+            if (project.SessionLengthMinutes < 1)
+                project.SessionLengthMinutes = settings.SessionLengthMinutes > 0 ? settings.SessionLengthMinutes : 40;
             if (project.DailyGoalHours is <= 0)
                 project.DailyGoalHours = null;
         }
