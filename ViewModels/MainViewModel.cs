@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml;
 using TimeTracker.Models;
 using TimeTracker.Services;
 using TimeTracker.Views;
@@ -23,6 +23,8 @@ public partial class MainViewModel : ObservableObject
         _alarm = alarm;
         BreakMinutesText = "5";
     }
+
+    public XamlRoot? DialogXamlRoot { get; set; }
 
     public ObservableCollection<Project> Projects { get; } = [];
 
@@ -133,7 +135,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void ToggleSession()
+    async Task ToggleSession()
     {
         var now = DateTimeOffset.Now;
         var project = SelectedProject;
@@ -146,7 +148,7 @@ public partial class MainViewModel : ObservableObject
         }
         else if (_clock.IsPaused)
         {
-            if (!Resume(now))
+            if (!await ResumeAsync(now))
                 return;
         }
         else if (_clock.IsBreakActive)
@@ -162,14 +164,14 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void EndSession()
+    async Task EndSession()
     {
         var now = DateTimeOffset.Now;
         var threshold = ThresholdSeconds;
         var action = _clock.EndSession(now, null, threshold);
         if (action == ClockAction.NeedReason)
         {
-            var reason = AskReason(endingSession: true);
+            var reason = await AskReasonAsync(endingSession: true);
             if (reason is null)
                 return;
             action = _clock.EndSession(DateTimeOffset.Now, reason, threshold);
@@ -180,20 +182,16 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void OpenSettings() => OpenSettingsWindow(projectsOnly: false);
+    async Task OpenSettings() => await OpenSettingsWindowAsync(projectsOnly: false);
 
     [RelayCommand]
-    void OpenProjects() => OpenSettingsWindow(projectsOnly: true);
+    async Task OpenProjects() => await OpenSettingsWindowAsync(projectsOnly: true);
 
-    void OpenSettingsWindow(bool projectsOnly)
+    async Task OpenSettingsWindowAsync(bool projectsOnly)
     {
         var activeId = _clock.State.Session?.ProjectId;
-        var window = new SettingsWindow(_store, firstRun: false, activeId, projectsOnly)
-        {
-            Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(item => item.IsActive)
-                     ?? Application.Current?.MainWindow
-        };
-        if (window.ShowDialog() == true)
+        var window = new SettingsWindow(_store, firstRun: false, activeId, projectsOnly);
+        if (await window.ShowModalAsync())
         {
             _clock.Restore(DateTimeOffset.Now);
             ReloadProjects();
@@ -228,11 +226,16 @@ public partial class MainViewModel : ObservableObject
         if (_suppress > 0 || value is null)
             return;
 
+        _ = HandleProjectChangeAsync(value);
+    }
+
+    async Task HandleProjectChangeAsync(Project value)
+    {
         var session = _clock.State.Session;
         if (session is null || session.ProjectId == value.Id)
             return;
 
-        var choice = AskProjectChange(value.Name);
+        var choice = await AskProjectChangeAsync(value.Name);
         if (choice is null)
         {
             RevertProject(session.ProjectId);
@@ -270,37 +273,31 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    ProjectChangeChoice? AskProjectChange(string projectName)
+    async Task<ProjectChangeChoice?> AskProjectChangeAsync(string projectName)
     {
-        var dialog = new ProjectChangeDialog(projectName)
-        {
-            Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(item => item.IsActive)
-                    ?? Application.Current?.MainWindow
-        };
-        return dialog.ShowDialog() == true ? dialog.Choice : null;
+        if (DialogXamlRoot is null)
+            return null;
+        return await DialogService.AskProjectChangeAsync(DialogXamlRoot, projectName);
     }
 
-    bool Resume(DateTimeOffset now)
+    async Task<bool> ResumeAsync(DateTimeOffset now)
     {
         var threshold = ThresholdSeconds;
         var action = _clock.TryResume(now, null, threshold);
         if (action != ClockAction.NeedReason)
             return action == ClockAction.Done;
 
-        var reason = AskReason(endingSession: false);
+        var reason = await AskReasonAsync(endingSession: false);
         if (reason is null)
             return false;
         return _clock.TryResume(DateTimeOffset.Now, reason, threshold) == ClockAction.Done;
     }
 
-    string? AskReason(bool endingSession)
+    async Task<string?> AskReasonAsync(bool endingSession)
     {
-        var dialog = new ReasonDialog(endingSession)
-        {
-            Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(item => item.IsActive)
-                    ?? Application.Current?.MainWindow
-        };
-        return dialog.ShowDialog() == true ? dialog.ReasonText : null;
+        if (DialogXamlRoot is null)
+            return null;
+        return await DialogService.AskReasonAsync(DialogXamlRoot, endingSession);
     }
 
     void ReloadProjects()

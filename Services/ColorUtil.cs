@@ -1,5 +1,5 @@
 using System.Globalization;
-using System.Windows.Media;
+using Microsoft.UI.Xaml.Media;
 
 namespace TimeTracker.Services;
 
@@ -34,22 +34,18 @@ public static class ColorUtil
         return true;
     }
 
-    public static Color ToColor(string hex)
+    public static Windows.UI.Color ToColor(string hex)
     {
         if (!TryNormalize(hex, out var normalized))
-            return Colors.LightGray;
+            return Microsoft.UI.Colors.LightGray;
 
         var value = uint.Parse(normalized[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        return Color.FromRgb(
+        return Windows.UI.Color.FromArgb(
+            255,
             (byte)((value >> 16) & 0xFF),
             (byte)((value >> 8) & 0xFF),
             (byte)(value & 0xFF));
     }
 
-    public static SolidColorBrush ToBrush(string hex)
-    {
-        var brush = new SolidColorBrush(ToColor(hex));
-        brush.Freeze();
-        return brush;
-    }
+    public static SolidColorBrush ToBrush(string hex) => new(ToColor(hex));
 }

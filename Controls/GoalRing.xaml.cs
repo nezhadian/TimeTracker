@@ -1,13 +1,14 @@
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Shapes;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using TimeTracker.Models;
 using TimeTracker.Services;
+using Windows.Foundation;
 
 namespace TimeTracker.Controls;
 
-public partial class GoalRing : UserControl
+public sealed partial class GoalRing : UserControl
 {
     public static readonly DependencyProperty SegmentsProperty = DependencyProperty.Register(
         nameof(Segments),
@@ -61,7 +62,7 @@ public partial class GoalRing : UserControl
             Height = radius * 2,
             Stroke = ColorUtil.ToBrush("#F3F4F6"),
             StrokeThickness = thickness,
-            Fill = Brushes.Transparent
+            Fill = null
         });
         Canvas.SetLeft(Surface.Children[^1], center.X - radius);
         Canvas.SetTop(Surface.Children[^1], center.Y - radius);
@@ -74,7 +75,7 @@ public partial class GoalRing : UserControl
         foreach (var segment in segments)
         {
             var sweep = segment.Seconds / total * Math.PI * 2;
-            Surface.Children.Add(new Path
+            Surface.Children.Add(new Microsoft.UI.Xaml.Shapes.Path
             {
                 Stroke = ColorUtil.ToBrush(segment.StrokeHex),
                 StrokeThickness = thickness,
@@ -150,7 +151,9 @@ public partial class GoalRing : UserControl
             SweepDirection = SweepDirection.Clockwise,
             IsLargeArc = sweep > Math.PI
         });
-        return new PathGeometry(new[] { figure });
+        var geometry = new PathGeometry();
+        geometry.Figures.Add(figure);
+        return geometry;
     }
 
     static Point OnCircle(Point center, double radius, double angle)

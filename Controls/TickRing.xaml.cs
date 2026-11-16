@@ -1,11 +1,12 @@
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Shapes;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
+using Windows.Foundation;
 
 namespace TimeTracker.Controls;
 
-public partial class TickRing : UserControl
+public sealed partial class TickRing : UserControl
 {
     public static readonly DependencyProperty ElapsedFractionProperty = DependencyProperty.Register(
         nameof(ElapsedFraction),
@@ -43,8 +44,8 @@ public partial class TickRing : UserControl
         else if (fraction >= 1)
             lit = count;
 
-        var elapsedBrush = Freeze(Color.FromRgb(0x25, 0x63, 0xEB));
-        var idleBrush = Freeze(Color.FromRgb(0xE5, 0xE7, 0xEB));
+        var elapsedBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x25, 0x63, 0xEB));
+        var idleBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0xE5, 0xE7, 0xEB));
         for (var i = 0; i < count; i++)
         {
             var angle = -Math.PI / 2 + i * (Math.PI * 2 / count);
@@ -62,13 +63,6 @@ public partial class TickRing : UserControl
                 StrokeEndLineCap = PenLineCap.Round
             });
         }
-    }
-
-    static SolidColorBrush Freeze(Color color)
-    {
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
     }
 
     static Point OnCircle(Point center, double radius, double angle)

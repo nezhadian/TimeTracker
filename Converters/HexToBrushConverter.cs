@@ -1,15 +1,15 @@
 using System.Globalization;
-using System.Windows.Data;
-using System.Windows.Media;
+using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Media;
 using TimeTracker.Services;
 
 namespace TimeTracker.Converters;
 
 public sealed class HexToBrushConverter : IValueConverter
 {
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is string hex ? ColorUtil.ToBrush(hex) : Brushes.LightGray;
+    public object Convert(object? value, Type targetType, object? parameter, string language)
+        => value is string hex ? ColorUtil.ToBrush(hex) : new SolidColorBrush(Microsoft.UI.Colors.LightGray);
 
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object ConvertBack(object value, Type targetType, object? parameter, string language)
         => throw new NotSupportedException();
 }
