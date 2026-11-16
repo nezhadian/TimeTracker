@@ -1,6 +1,8 @@
 bin/
 obj/
 .vs/
+.cursor/
 *.user
 TestResults/
 artifacts/
+publish/
