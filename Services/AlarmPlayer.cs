@@ -4,9 +4,18 @@ namespace TimeTracker.Services;
 
 public sealed class AlarmPlayer
 {
-    public Task PlayBeepAsync()
+    public Task PlayBeepAsync() => PlayToneAsync(880, 380);
+
+    public async Task PlaySessionCompleteAsync()
     {
-        var wav = CreateBeepWav(880, 380);
+        await PlayToneAsync(523, 160);
+        await Task.Delay(50);
+        await PlayToneAsync(784, 320);
+    }
+
+    Task PlayToneAsync(int frequency, int milliseconds)
+    {
+        var wav = CreateBeepWav(frequency, milliseconds);
         return Task.Run(() =>
         {
             using var stream = new MemoryStream(wav);

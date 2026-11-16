@@ -16,6 +16,7 @@ public partial class MainViewModel : ObservableObject
     int _suppress;
     bool _alarmRunning;
     bool _completionPromptShown;
+    bool _sessionCompleteAlerted;
     bool _promptingReason;
 
     public MainViewModel(TimeStore store, SessionClock clock, AlarmPlayer alarm)
@@ -147,11 +148,16 @@ public partial class MainViewModel : ObservableObject
 
     public void Start()
     {
+        var wasRunning = _store.LoadState().Session?.SliceStart is not null;
         _clock.Restore(DateTimeOffset.Now);
         _store.ImportBreakReasonsFromHistory();
         ReloadProjects();
         ReloadBreakReasons();
         Refresh();
+        if (wasRunning && _clock.IsSessionComplete)
+            AlertSessionCompleted();
+        else if (_clock.IsSessionComplete)
+            _sessionCompleteAlerted = true;
         _ = PromptIfSessionCompletedAsync();
     }
 
@@ -159,6 +165,7 @@ public partial class MainViewModel : ObservableObject
     {
         var now = DateTimeOffset.Now;
         var wasActive = IsLive;
+        var wasComplete = _clock.IsSessionComplete;
         try
         {
             _clock.CatchUp(now);
@@ -171,6 +178,7 @@ public partial class MainViewModel : ObservableObject
             ErrorText = "Couldn't save the session. " + ex.Message;
         }
 
+        AlertIfSessionJustCompleted(wasComplete);
         StartAlarmIfDue();
         Refresh();
         RefreshHistoryLive(now);
@@ -601,6 +609,43 @@ public partial class MainViewModel : ObservableObject
         }
 
         return total;
+    }
+
+    void AlertIfSessionJustCompleted(bool wasComplete)
+    {
+        if (!_clock.IsSessionComplete)
+        {
+            _sessionCompleteAlerted = false;
+            return;
+        }
+
+        if (wasComplete)
+            return;
+
+        AlertSessionCompleted();
+    }
+
+    void AlertSessionCompleted()
+    {
+        if (_sessionCompleteAlerted)
+            return;
+
+        _sessionCompleteAlerted = true;
+        var name = _clock.State.Session?.ProjectName ?? SelectedProject?.Name ?? "";
+        _ = PlaySessionCompleteAlertAsync(name);
+    }
+
+    async Task PlaySessionCompleteAlertAsync(string projectName)
+    {
+        try
+        {
+            await _alarm.PlaySessionCompleteAsync();
+        }
+        catch
+        {
+        }
+
+        SessionNotifier.ShowSessionComplete(projectName);
     }
 
     void StartAlarmIfDue()
