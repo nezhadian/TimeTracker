@@ -1,0 +1,158 @@
+<Window x:Class="TimeTracker.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:TimeTracker.Controls"
+        Title="Focus"
+        Width="1120"
+        Height="820"
+        MinWidth="980"
+        MinHeight="700"
+        WindowStartupLocation="CenterScreen"
+        Background="#EEF1F4"
+        FontFamily="Segoe UI"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <Grid Margin="24">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="20"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <TextBlock Text="Focus session" FontSize="20" FontWeight="SemiBold" Foreground="#111827"/>
+
+          <Grid Grid.Row="1" Width="250" Height="250" HorizontalAlignment="Center" Margin="0,18,0,8">
+            <controls:TickRing ElapsedFraction="{Binding ElapsedFraction}"/>
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
+              <TextBlock Text="{Binding RemainingText}" FontSize="48" FontWeight="Light" Foreground="#111827"
+                         HorizontalAlignment="Center"/>
+              <TextBlock Text="{Binding SessionStatus}" FontSize="13" Foreground="#6B7280" Height="18"
+                         HorizontalAlignment="Center"/>
+            </StackPanel>
+          </Grid>
+
+          <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,18">
+            <Button Style="{StaticResource CircleButton}" Background="#2563EB" Margin="0,0,12,0"
+                    Command="{Binding ToggleSessionCommand}" IsEnabled="{Binding CanToggleSession}"
+                    ToolTip="{Binding PrimaryToolTip}" AutomationProperties.Name="{Binding PrimaryToolTip}">
+              <TextBlock FontFamily="Segoe MDL2 Assets" Text="{Binding PrimaryGlyph}" FontSize="18" Foreground="White"/>
+            </Button>
+            <Button Style="{StaticResource CircleButton}" Background="#F3F4F6" Click="OpenMore" ToolTip="More"
+                    AutomationProperties.Name="More">
+              <Button.ContextMenu>
+                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                  <MenuItem Header="End session" Command="{Binding EndSessionCommand}"/>
+                  <MenuItem Header="Settings" Command="{Binding OpenSettingsCommand}"/>
+                </ContextMenu>
+              </Button.ContextMenu>
+              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="16" Foreground="#111827"/>
+            </Button>
+          </StackPanel>
+
+          <StackPanel Grid.Row="3">
+            <ComboBox ItemsSource="{Binding Projects}" SelectedItem="{Binding SelectedProject}" Height="38"
+                      VerticalContentAlignment="Center" Padding="8,0">
+              <ComboBox.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                             Fill="{Binding Color, Converter={StaticResource HexBrush}}"/>
+                    <TextBlock Text="{Binding Name}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                  </StackPanel>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="{Binding StoppedTodayText}" Margin="0,14,0,0" Foreground="#6B7280" FontSize="13"/>
+            <TextBlock Text="{Binding SelectedProjectTodayText}" Margin="0,4,0,0" Foreground="#111827" FontSize="14"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource Card}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <Grid>
+            <TextBlock Text="Daily progress" FontSize="20" FontWeight="SemiBold" Foreground="#111827"
+                       VerticalAlignment="Center"/>
+            <Button HorizontalAlignment="Right" Style="{StaticResource IconButton}"
+                    Command="{Binding OpenSettingsCommand}" ToolTip="Settings" AutomationProperties.Name="Settings">
+              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14" Foreground="#111827"/>
+            </Button>
+          </Grid>
+
+          <Grid Grid.Row="1" Margin="0,12,0,8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="92"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="92"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="Yesterday" Foreground="#6B7280" FontSize="13" HorizontalAlignment="Center"/>
+              <TextBlock Text="{Binding YesterdayText}" FontSize="18" Foreground="#111827" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+            </StackPanel>
+            <Grid Grid.Column="1" Height="300">
+              <controls:GoalRing Segments="{Binding RingSegments}" ShowLabels="{Binding ShowRingLabels}"/>
+              <TextBlock Text="{Binding GoalCenterText}" FontSize="28" FontWeight="SemiBold" Foreground="#111827"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+            </Grid>
+            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+              <TextBlock Text="Streak" Foreground="#6B7280" FontSize="13" HorizontalAlignment="Center"/>
+              <TextBlock Text="{Binding StreakText}" FontSize="18" Foreground="#111827" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+            </StackPanel>
+          </Grid>
+
+          <TextBlock Grid.Row="2" Text="{Binding CompletedText}" FontSize="15" Foreground="#111827" Margin="0,8,0,0"/>
+        </Grid>
+      </Border>
+
+      <CheckBox Grid.Row="1" Grid.Column="2" Margin="8,14,0,0" Content="Show daily overview"
+                Style="{StaticResource OverviewSwitch}" IsChecked="{Binding ShowDailyOverview}"/>
+
+      <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Style="{StaticResource Card}" Margin="0,18,0,0">
+        <Grid VerticalAlignment="Center">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="130"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Break" FontSize="20" FontWeight="SemiBold" Foreground="#111827" VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <TextBox Width="72" Style="{StaticResource Field}" Text="{Binding BreakMinutesText, UpdateSourceTrigger=PropertyChanged}"
+                     IsEnabled="{Binding BreakFieldsEnabled}" ToolTip="Break length in minutes"/>
+            <TextBlock Text="min" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="#6B7280"/>
+          </StackPanel>
+          <TextBox Grid.Column="1" Margin="16,0" Style="{StaticResource Field}"
+                   Text="{Binding BreakReason, UpdateSourceTrigger=PropertyChanged}"
+                   IsEnabled="{Binding BreakFieldsEnabled}" ToolTip="Break reason"/>
+          <Button Grid.Column="2" Style="{StaticResource PrimaryAction}" Content="{Binding BreakButtonText}"
+                  Command="{Binding StartOrCancelBreakCommand}" MinWidth="120"/>
+          <TextBlock Grid.Column="3" Text="{Binding BreakRemainingText}" FontSize="28" FontWeight="Light"
+                     Foreground="#111827" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+        </Grid>
+      </Border>
+
+      <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding ErrorText}" Foreground="#B91C1C"
+                 Margin="8,10,0,0" TextWrapping="Wrap"/>
+    </Grid>
+  </ScrollViewer>
+</Window>

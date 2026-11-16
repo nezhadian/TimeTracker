@@ -1,0 +1,23 @@
+<Window x:Class="TimeTracker.Views.ReasonDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Why did you stop?"
+        Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="White"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False">
+  <StackPanel Margin="24">
+    <TextBlock x:Name="Prompt" Text="This stop was longer than your threshold. Enter a reason to resume."
+               TextWrapping="Wrap" Foreground="#374151" Margin="0,0,0,12"/>
+    <TextBox x:Name="ReasonBox" Style="{StaticResource Field}" TextChanged="ReasonBox_TextChanged"/>
+    <TextBlock x:Name="Hint" Text="A reason is required." Foreground="#B91C1C" FontSize="12" Margin="0,8,0,0"/>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+      <Button Content="Stay paused" Width="110" Height="36" Margin="0,0,8,0" IsCancel="True"/>
+      <Button x:Name="OkButton" Content="Resume" Width="96" Height="36" Style="{StaticResource PrimaryAction}"
+              IsDefault="True" IsEnabled="False" Click="Ok_Click"/>
+    </StackPanel>
+  </StackPanel>
+</Window>
