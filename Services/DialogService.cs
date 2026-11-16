@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TimeTracker.Views;
@@ -6,7 +7,11 @@ namespace TimeTracker.Services;
 
 public static class DialogService
 {
-    public static async Task<string?> AskReasonAsync(XamlRoot xamlRoot, bool endingSession)
+    public static async Task<string?> AskReasonAsync(
+        XamlRoot xamlRoot,
+        bool endingSession,
+        DateTimeOffset stoppedAt,
+        long stoppedSeconds)
     {
         var box = new TextBox();
         var hint = new TextBlock
@@ -23,18 +28,35 @@ public static class DialogService
             hint.Visibility = ready ? Visibility.Collapsed : Visibility.Visible;
         }
 
+        box.PlaceholderText = "Why did you stop?";
         box.TextChanged += (_, _) => UpdateHint();
         UpdateHint();
 
-        var content = new StackPanel();
-        content.Children.Add(new TextBlock
+        var clock = stoppedAt.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture);
+        var duration = TimeMath.FormatShort(stoppedSeconds);
+        var times = new StackPanel
         {
-            Text = endingSession
-                ? "This stop was longer than your threshold. Enter a reason to end the session."
-                : "This stop was longer than your threshold. Enter a reason to resume.",
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 8, 0, 20)
+        };
+        times.Children.Add(new TextBlock
+        {
+            Text = duration,
+            FontSize = 48,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            HorizontalAlignment = HorizontalAlignment.Center
         });
+        times.Children.Add(new TextBlock
+        {
+            Text = "Stopped at " + clock,
+            FontSize = 13,
+            Opacity = 0.65,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 6, 0, 0)
+        });
+
+        var content = new StackPanel();
+        content.Children.Add(times);
         content.Children.Add(box);
         content.Children.Add(hint);
 

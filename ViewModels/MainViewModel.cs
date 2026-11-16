@@ -351,7 +351,10 @@ public partial class MainViewModel : ObservableObject
     {
         if (DialogXamlRoot is null)
             return null;
-        return await DialogService.AskReasonAsync(DialogXamlRoot, endingSession);
+        var now = DateTimeOffset.Now;
+        var stoppedAt = _clock.State.Session?.PauseStart ?? now;
+        var stoppedSeconds = TimeMath.SecondsBetween(stoppedAt, now);
+        return await DialogService.AskReasonAsync(DialogXamlRoot, endingSession, stoppedAt, stoppedSeconds);
     }
 
     void ReloadProjects()
