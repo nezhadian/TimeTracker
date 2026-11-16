@@ -1,30 +1,53 @@
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
+using TimeTracker.Models;
 using TimeTracker.Views;
 
 namespace TimeTracker.Services;
 
 public static class DialogService
 {
-    public static async Task<string?> AskReasonAsync(
+    const string ReasonItemTemplateXaml =
+        """
+        <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+          <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Ellipse Width="12" Height="12" Fill="{Binding Swatch}" Visibility="{Binding SwatchVisibility}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center"/>
+          </Grid>
+        </DataTemplate>
+        """;
+
+    public static async Task<StopReasonChoice?> AskReasonAsync(
         XamlRoot xamlRoot,
         bool endingSession,
         DateTimeOffset stoppedAt,
         long stoppedSeconds,
         IReadOnlyList<string>? savedReasons = null,
+        IReadOnlyList<Project>? projects = null,
         bool startNewSession = false)
     {
+        var items = new List<ReasonListItem>();
+        foreach (var project in projects ?? [])
+            items.Add(ReasonListItem.FromProject(project));
+        foreach (var reason in savedReasons ?? [])
+            items.Add(ReasonListItem.FromText(reason));
+
         var box = new ComboBox
         {
             IsEditable = true,
             PlaceholderText = "Reason",
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            MinWidth = 320
+            MinWidth = 320,
+            ItemTemplate = (DataTemplate)XamlReader.Load(ReasonItemTemplateXaml),
+            ItemsSource = items
         };
-        foreach (var reason in savedReasons ?? [])
-            box.Items.Add(reason);
 
         var hint = new TextBlock
         {
@@ -34,16 +57,17 @@ public static class DialogService
             Margin = new Thickness(0, 8, 0, 0)
         };
 
-        string Chosen()
+        StopReasonChoice? Chosen()
         {
             var typed = box.Text?.Trim() ?? "";
-            if (typed.Length > 0)
-                return typed;
-            return (box.SelectedItem as string)?.Trim() ?? "";
+            if (box.SelectedItem is ReasonListItem { Project: { } project }
+                && (typed.Length == 0 || string.Equals(typed, project.Name, StringComparison.OrdinalIgnoreCase)))
+                return StopReasonChoice.ForProject(project);
+            return typed.Length == 0 ? null : StopReasonChoice.ForText(typed);
         }
 
         void UpdateHint()
-            => hint.Visibility = Chosen().Length > 0 ? Visibility.Collapsed : Visibility.Visible;
+            => hint.Visibility = Chosen() is null ? Visibility.Visible : Visibility.Collapsed;
 
         box.SelectionChanged += (_, _) => UpdateHint();
         box.Loaded += (_, _) =>
@@ -93,12 +117,34 @@ public static class DialogService
 
         dialog.PrimaryButtonClick += (_, args) =>
         {
-            if (Chosen().Length == 0)
+            if (Chosen() is null)
                 args.Cancel = true;
         };
 
         var result = await dialog.ShowAsync();
         return result == ContentDialogResult.Primary ? Chosen() : null;
+    }
+
+    sealed class ReasonListItem
+    {
+        public string Label { get; init; } = "";
+        public Project? Project { get; init; }
+        public Brush Swatch { get; init; } = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        public Visibility SwatchVisibility { get; init; } = Visibility.Collapsed;
+
+        public override string ToString() => Label;
+
+        public static ReasonListItem FromProject(Project project)
+            => new()
+            {
+                Label = project.Name,
+                Project = project,
+                Swatch = ColorUtil.ToBrush(project.Color),
+                SwatchVisibility = Visibility.Visible
+            };
+
+        public static ReasonListItem FromText(string reason)
+            => new() { Label = reason };
     }
 
     static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject

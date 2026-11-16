@@ -414,6 +414,40 @@ public class ClockTests : IDisposable
         Assert.Equal(new[] { "phone", "coffee" }, _store.Settings.BreakReasons);
     }
 
+    [Fact]
+    public void Choosing_a_project_as_the_stop_reason_counts_the_pause_as_work()
+    {
+        var start = Local(10, 0);
+        _clock.StartSession(_alpha, 40 * 60, start);
+        _clock.Pause(start.AddMinutes(1));
+        Assert.Equal(ClockAction.Done, _clock.TryResume(start.AddMinutes(5), null, 180, _beta));
+
+        Assert.True(_clock.IsRunning);
+        Assert.Equal(60, _clock.SessionElapsedSeconds(start.AddMinutes(5)));
+        var day = _store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime));
+        Assert.Empty(day.Stops.Where(item => !item.Open));
+        var focus = Assert.Single(day.Slices, item => item.ProjectId == "alpha" && !item.Open);
+        Assert.Equal(60, focus.Seconds);
+        var credited = Assert.Single(day.Slices, item => item.ProjectId == "beta" && !item.Open);
+        Assert.Equal(4 * 60, credited.Seconds);
+        Assert.Equal("#F59E0B", credited.Color);
+    }
+
+    [Fact]
+    public void Ending_with_a_project_reason_counts_the_stop_as_work()
+    {
+        var start = Local(10, 0);
+        _clock.StartSession(_alpha, 40 * 60, start);
+        _clock.Pause(start.AddMinutes(1));
+        Assert.Equal(ClockAction.Done, _clock.EndSession(start.AddMinutes(6), null, 180, _beta));
+
+        Assert.Null(_clock.State.Session);
+        var day = _store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime));
+        Assert.Empty(day.Stops.Where(item => !item.Open));
+        var credited = Assert.Single(day.Slices, item => item.ProjectId == "beta");
+        Assert.Equal(5 * 60, credited.Seconds);
+    }
+
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
     static DateTimeOffset Local(int hour, int minute)

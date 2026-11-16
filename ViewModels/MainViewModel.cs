@@ -236,7 +236,7 @@ public partial class MainViewModel : ObservableObject
             var reason = await AskReasonAsync(endingSession: true);
             if (reason is null)
                 return;
-            action = _clock.EndSession(DateTimeOffset.Now, reason, threshold);
+            action = _clock.EndSession(DateTimeOffset.Now, reason.Text, threshold, reason.Project);
         }
 
         if (action == ClockAction.Done)
@@ -397,7 +397,7 @@ public partial class MainViewModel : ObservableObject
         var reason = await AskReasonAsync(endingSession: false);
         if (reason is null)
             return false;
-        return _clock.TryResume(DateTimeOffset.Now, reason, threshold) == ClockAction.Done;
+        return _clock.TryResume(DateTimeOffset.Now, reason.Text, threshold, reason.Project) == ClockAction.Done;
     }
 
     async Task PromptIfSessionCompletedAsync()
@@ -417,14 +417,14 @@ public partial class MainViewModel : ObservableObject
         var reason = await AskReasonAsync(endingSession: false);
         if (reason is null)
             return;
-        if (_clock.TryResume(DateTimeOffset.Now, reason, ThresholdSeconds) != ClockAction.Done)
+        if (_clock.TryResume(DateTimeOffset.Now, reason.Text, ThresholdSeconds, reason.Project) != ClockAction.Done)
             return;
         if (_clock.State.Session is null && SelectedProject is not null)
             _clock.StartSession(SelectedProject, _store.Settings.SessionLengthMinutes * 60, DateTimeOffset.Now);
         Refresh();
     }
 
-    async Task<string?> AskReasonAsync(bool endingSession, bool startNewSession = false)
+    async Task<StopReasonChoice?> AskReasonAsync(bool endingSession, bool startNewSession = false)
     {
         if (DialogXamlRoot is null || _promptingReason)
             return null;
@@ -441,10 +441,11 @@ public partial class MainViewModel : ObservableObject
                 stoppedAt,
                 stoppedSeconds,
                 _store.ListBreakReasons(),
+                _store.Settings.Projects,
                 startNewSession: startNewSession || (!endingSession && _clock.IsSessionComplete));
-            if (!string.IsNullOrWhiteSpace(reason))
+            if (reason?.Project is null && !string.IsNullOrWhiteSpace(reason?.Text))
             {
-                _store.RememberBreakReason(reason);
+                _store.RememberBreakReason(reason.Text);
                 ReloadBreakReasons();
             }
 

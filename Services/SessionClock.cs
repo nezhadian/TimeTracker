@@ -79,7 +79,7 @@ public sealed class SessionClock
         return ClockAction.Done;
     }
 
-    public ClockAction TryResume(DateTimeOffset now, string? reason, int thresholdSeconds)
+    public ClockAction TryResume(DateTimeOffset now, string? reason, int thresholdSeconds, Project? creditToProject = null)
     {
         var session = State.Session;
         if (session?.PauseStart is null || IsBreakActive)
@@ -87,13 +87,14 @@ public sealed class SessionClock
 
         if (NeedsReason(session, now, thresholdSeconds))
         {
-            if (string.IsNullOrWhiteSpace(reason))
+            if (creditToProject is null && string.IsNullOrWhiteSpace(reason))
                 return ClockAction.NeedReason;
-            session.PauseReason = reason.Trim();
+            if (creditToProject is null)
+                session.PauseReason = reason!.Trim();
             session.ReasonCaptured = true;
         }
 
-        CloseOpenPause(now);
+        CloseOpenPause(now, creditToProject);
         if (session.CompletedSeconds >= session.PlannedSeconds)
         {
             State.Session = null;
@@ -109,7 +110,7 @@ public sealed class SessionClock
         return ClockAction.Done;
     }
 
-    public ClockAction EndSession(DateTimeOffset now, string? reason, int thresholdSeconds)
+    public ClockAction EndSession(DateTimeOffset now, string? reason, int thresholdSeconds, Project? creditToProject = null)
     {
         var session = State.Session;
         if (session is null)
@@ -129,13 +130,14 @@ public sealed class SessionClock
         {
             if (NeedsReason(session, now, thresholdSeconds))
             {
-                if (string.IsNullOrWhiteSpace(reason))
+                if (creditToProject is null && string.IsNullOrWhiteSpace(reason))
                     return ClockAction.NeedReason;
-                session.PauseReason = reason.Trim();
+                if (creditToProject is null)
+                    session.PauseReason = reason!.Trim();
                 session.ReasonCaptured = true;
             }
 
-            CloseOpenPause(now);
+            CloseOpenPause(now, creditToProject);
         }
 
         State.Session = null;
@@ -432,7 +434,7 @@ public sealed class SessionClock
         AppendSlice(slice);
     }
 
-    void CloseOpenPause(DateTimeOffset end)
+    void CloseOpenPause(DateTimeOffset end, Project? creditToProject = null)
     {
         var session = State.Session;
         if (session?.PauseStart is not DateTimeOffset start)
@@ -444,11 +446,23 @@ public sealed class SessionClock
         {
             var midnight = TimeMath.NextLocalMidnight(cursor);
             var partEnd = midnight < end ? midnight : end;
-            var stop = MakeStop(session, cursor, partEnd, open: false);
-            if (stop.Seconds > 0)
+            if (creditToProject is not null)
             {
-                RemoveOpenStop(TimeMath.LocalDate(cursor));
-                AppendStop(stop);
+                var slice = MakeSlice(creditToProject, cursor, partEnd);
+                if (slice.Seconds > 0)
+                {
+                    RemoveOpenStop(TimeMath.LocalDate(cursor));
+                    AppendSlice(slice);
+                }
+            }
+            else
+            {
+                var stop = MakeStop(session, cursor, partEnd, open: false);
+                if (stop.Seconds > 0)
+                {
+                    RemoveOpenStop(TimeMath.LocalDate(cursor));
+                    AppendStop(stop);
+                }
             }
             cursor = partEnd;
         }
@@ -513,6 +527,18 @@ public sealed class SessionClock
             End = open ? null : end,
             Seconds = TimeMath.SecondsBetween(start, end),
             Open = open
+        };
+
+    static WorkSlice MakeSlice(Project project, DateTimeOffset start, DateTimeOffset end)
+        => new()
+        {
+            ProjectId = project.Id,
+            Name = project.Name,
+            Color = project.Color,
+            Start = start,
+            End = end,
+            Seconds = TimeMath.SecondsBetween(start, end),
+            Open = false
         };
 
     static StopEntry MakeStop(LiveSession session, DateTimeOffset start, DateTimeOffset end, bool open)
