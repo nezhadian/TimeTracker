@@ -28,7 +28,17 @@ public partial class MainViewModel : ObservableObject
 
     public ObservableCollection<Project> Projects { get; } = [];
 
+    public ObservableCollection<HistoryDayItem> HistoryDays { get; } = [];
+
+    public ObservableCollection<HistoryEvent> HistoryEvents { get; } = [];
+
+    public ObservableCollection<HistoryProjectTotal> HistoryProjects { get; } = [];
+
     public IReadOnlyList<RingSegment> RingSegments { get; private set; } = [];
+
+    public IReadOnlyList<HistoryBarSegment> HistoryBarItems { get; private set; } = [];
+
+    string _historyStamp = "";
 
     [ObservableProperty]
     private Project? _selectedProject;
@@ -67,6 +77,9 @@ public partial class MainViewModel : ObservableObject
     private string _goalCenterText = "12h";
 
     [ObservableProperty]
+    private string _goalHoursNumber = "12";
+
+    [ObservableProperty]
     private string _completedText = "Completed: 0 hours, 0 minutes";
 
     [ObservableProperty]
@@ -93,6 +106,27 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _errorText = "";
 
+    [ObservableProperty]
+    private bool _showHistory;
+
+    [ObservableProperty]
+    private HistoryDayItem? _selectedHistoryDay;
+
+    [ObservableProperty]
+    private string _historyDateText = "History";
+
+    [ObservableProperty]
+    private string _historySummaryText = "Select a day to see its log.";
+
+    [ObservableProperty]
+    private bool _hasHistoryEvents;
+
+    public bool ShowFocus => !ShowHistory;
+
+    public bool HasHistoryDays => HistoryDays.Count > 0;
+
+    public bool ShowEmptyDayLog => SelectedHistoryDay is not null && !HasHistoryEvents;
+
     public void Start()
     {
         _clock.Restore(DateTimeOffset.Now);
@@ -118,6 +152,7 @@ public partial class MainViewModel : ObservableObject
 
         StartAlarmIfDue();
         Refresh();
+        RefreshHistoryLive(now);
     }
 
     public void Flush()
@@ -196,6 +231,8 @@ public partial class MainViewModel : ObservableObject
             _clock.Restore(DateTimeOffset.Now);
             ReloadProjects();
             Refresh();
+            if (ShowHistory)
+                LoadHistory();
         }
     }
 
@@ -249,6 +286,23 @@ public partial class MainViewModel : ObservableObject
             _clock.RestartSessionOnProject(value, now);
         Refresh();
     }
+
+    partial void OnShowHistoryChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowFocus));
+        if (value)
+            LoadHistory();
+    }
+
+    partial void OnSelectedHistoryDayChanged(HistoryDayItem? value)
+    {
+        OnPropertyChanged(nameof(ShowEmptyDayLog));
+        if (_suppress > 0)
+            return;
+        LoadTimeline();
+    }
+
+    partial void OnHasHistoryEventsChanged(bool value) => OnPropertyChanged(nameof(ShowEmptyDayLog));
 
     partial void OnShowDailyOverviewChanged(bool value)
     {
@@ -370,6 +424,7 @@ public partial class MainViewModel : ObservableObject
         var todayWork = slices.Sum(slice => slice.Seconds);
         StreakText = _store.ComputeStreak(today, todayWork, settings.DailyGoalHours).ToString();
         GoalCenterText = TimeMath.FormatGoal(settings.DailyGoalHours);
+        GoalHoursNumber = TimeMath.FormatGoalNumber(settings.DailyGoalHours);
         BreakButtonText = _clock.IsBreakActive ? "Cancel break" : "Start break";
         BreakFieldsEnabled = !_clock.IsBreakActive;
         BreakRemainingText = _clock.IsBreakActive
@@ -454,6 +509,155 @@ public partial class MainViewModel : ObservableObject
             _alarmRunning = false;
             Refresh();
         }
+    }
+
+    void LoadHistory()
+    {
+        var keep = SelectedHistoryDay?.Date;
+        var now = DateTimeOffset.Now;
+        var today = TimeMath.LocalDate(now);
+        var dates = _store.ListDays().OrderByDescending(date => date).ToList();
+        if (_store.DayExists(today) && dates.All(date => date != today))
+            dates.Insert(0, today);
+
+        _suppress++;
+        try
+        {
+            HistoryDays.Clear();
+            foreach (var date in dates)
+                HistoryDays.Add(CreateDayItem(date, today, now));
+
+            SelectedHistoryDay = HistoryDays.FirstOrDefault(item => item.Date == keep)
+                ?? HistoryDays.FirstOrDefault();
+        }
+        finally
+        {
+            _suppress--;
+        }
+
+        OnPropertyChanged(nameof(HasHistoryDays));
+        LoadTimeline();
+    }
+
+    void RefreshHistoryLive(DateTimeOffset now)
+    {
+        if (!ShowHistory)
+            return;
+
+        var today = TimeMath.LocalDate(now);
+        if (!_store.DayExists(today))
+            return;
+
+        var item = HistoryDays.FirstOrDefault(day => day.Date == today);
+        if (item is null)
+        {
+            HistoryDays.Insert(0, CreateDayItem(today, today, now));
+            OnPropertyChanged(nameof(HasHistoryDays));
+            if (SelectedHistoryDay is null)
+            {
+                _suppress++;
+                try
+                {
+                    SelectedHistoryDay = HistoryDays[0];
+                }
+                finally
+                {
+                    _suppress--;
+                }
+            }
+        }
+        else
+        {
+            ApplyDayItem(item, today, now);
+        }
+
+        if (SelectedHistoryDay?.Date != today)
+            return;
+
+        var day = _store.LoadDay(today);
+        var stamp = HistoryTimelineBuilder.Stamp(day);
+        if (stamp != _historyStamp)
+        {
+            LoadTimeline();
+            return;
+        }
+
+        foreach (var ev in HistoryEvents.Where(item => item.Open))
+        {
+            if (ev.Kind == HistoryEventKind.Work)
+            {
+                var slice = day.Slices.FirstOrDefault(item => item.Open && item.Start == ev.Start);
+                if (slice is null)
+                    continue;
+                var seconds = slice.Seconds > 0 ? slice.Seconds : TimeMath.SecondsBetween(slice.Start, now);
+                HistoryTimelineBuilder.RefreshTiming(ev, null, seconds, true);
+            }
+            else
+            {
+                var stop = day.Stops.FirstOrDefault(item => item.Open && item.Start == ev.Start);
+                if (stop is not null)
+                {
+                    var seconds = stop.Seconds > 0 ? stop.Seconds : TimeMath.SecondsBetween(stop.Start, now);
+                    HistoryTimelineBuilder.RefreshTiming(ev, null, seconds, true);
+                    continue;
+                }
+
+                var entry = day.Breaks.FirstOrDefault(item => item.Open && item.Start == ev.Start);
+                if (entry is null)
+                    continue;
+                HistoryTimelineBuilder.RefreshTiming(ev, null, TimeMath.SecondsBetween(entry.Start, now), true);
+            }
+        }
+
+        HistorySummaryText = HistoryTimelineBuilder.Build(day, now).SummaryText;
+    }
+
+    void LoadTimeline()
+    {
+        HistoryEvents.Clear();
+        HistoryProjects.Clear();
+        HistoryBarItems = [];
+        _historyStamp = "";
+
+        if (SelectedHistoryDay is null)
+        {
+            HistoryDateText = "History";
+            HistorySummaryText = HasHistoryDays
+                ? "Select a day to see its log."
+                : "No days logged yet.";
+            HasHistoryEvents = false;
+            OnPropertyChanged(nameof(HistoryBarItems));
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        var day = _store.LoadDay(SelectedHistoryDay.Date);
+        var view = HistoryTimelineBuilder.Build(day, now);
+        HistoryDateText = view.DateText;
+        HistorySummaryText = view.SummaryText;
+        foreach (var item in view.Events)
+            HistoryEvents.Add(item);
+        foreach (var project in view.Projects)
+            HistoryProjects.Add(project);
+        HistoryBarItems = view.BarSegments;
+        HasHistoryEvents = HistoryEvents.Count > 0;
+        _historyStamp = HistoryTimelineBuilder.Stamp(day);
+        OnPropertyChanged(nameof(HistoryBarItems));
+    }
+
+    HistoryDayItem CreateDayItem(DateOnly date, DateOnly today, DateTimeOffset now)
+    {
+        var item = new HistoryDayItem(date);
+        ApplyDayItem(item, today, now);
+        return item;
+    }
+
+    void ApplyDayItem(HistoryDayItem item, DateOnly today, DateTimeOffset now)
+    {
+        var day = _store.LoadDay(item.Date);
+        item.Title = HistoryTimelineBuilder.FormatListTitle(item.Date);
+        item.Subtitle = HistoryTimelineBuilder.FormatListSubtitle(day, now);
+        item.Badge = HistoryTimelineBuilder.FormatBadge(item.Date, today);
     }
 
     bool IsLive => _clock.State.Session is not null || _clock.State.Break is not null;

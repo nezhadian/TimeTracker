@@ -22,6 +22,14 @@ public sealed partial class GoalRing : UserControl
         typeof(GoalRing),
         new PropertyMetadata(false, (d, _) => ((GoalRing)d).Redraw()));
 
+    const double Thickness = 26;
+    const string TrackHex = "#F3F4F6";
+
+    static readonly HashSet<string> TrackColors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "#E5E7EB", "#F3F4F6", "#4B5563", TickMarkPainter.IdleHex, TrackHex
+    };
+
     public GoalRing()
     {
         InitializeComponent();
@@ -48,47 +56,68 @@ public sealed partial class GoalRing : UserControl
         if (width < 40 || height < 40)
             return;
 
-        var segments = Segments?.Where(segment => segment.Seconds > 0).ToList() ?? [];
-        var labelRoom = ShowLabels ? 68 : 12;
-        const double thickness = 20;
-        var radius = Math.Min(width, height) / 2 - labelRoom - thickness / 2;
-        if (radius < 36)
-            radius = 36;
+        var labelRoom = ShowLabels ? 68 : 16;
+        var radius = Math.Min(width, height) / 2 - labelRoom - Thickness / 2;
+        if (radius < 48)
+            radius = 48;
         var center = new Point(width / 2, height / 2);
+        AddCircle(center, radius, TrackHex, Thickness);
 
-        Surface.Children.Add(new Ellipse
-        {
-            Width = radius * 2,
-            Height = radius * 2,
-            Stroke = ColorUtil.ToBrush("#F3F4F6"),
-            StrokeThickness = thickness,
-            Fill = null
-        });
-        Canvas.SetLeft(Surface.Children[^1], center.X - radius);
-        Canvas.SetTop(Surface.Children[^1], center.Y - radius);
-
+        var segments = Segments?.Where(segment => segment.Seconds > 0).ToList() ?? [];
         var total = segments.Sum(segment => segment.Seconds);
         if (total <= 0)
             return;
 
+        var colored = segments.Count(segment => !IsTrack(segment.StrokeHex));
         var angle = -Math.PI / 2;
         foreach (var segment in segments)
         {
             var sweep = segment.Seconds / total * Math.PI * 2;
-            Surface.Children.Add(new Microsoft.UI.Xaml.Shapes.Path
+            if (!IsTrack(segment.StrokeHex))
             {
-                Stroke = ColorUtil.ToBrush(segment.StrokeHex),
-                StrokeThickness = thickness,
-                StrokeStartLineCap = PenLineCap.Flat,
-                StrokeEndLineCap = PenLineCap.Flat,
-                Data = CreateArc(center, radius, angle, sweep)
-            });
+                if (sweep >= Math.PI * 2 - 0.001)
+                    AddCircle(center, radius, segment.StrokeHex, Thickness);
+                else
+                {
+                    var gap = colored > 1 ? Math.Min(8 / radius, sweep / 4) : 0;
+                    var visible = sweep - gap;
+                    if (visible > 0.002)
+                        AddArc(center, radius, angle + gap / 2, visible, segment.StrokeHex);
+                }
+            }
 
             if (ShowLabels && segment.ShowLabel && !string.IsNullOrWhiteSpace(segment.Label) && sweep >= 14 * Math.PI / 180)
-                AddLabel(segment, center, radius + thickness / 2 + 8, angle + sweep / 2);
+                AddLabel(segment, center, radius + Thickness / 2 + 8, angle + sweep / 2);
 
             angle += sweep;
         }
+    }
+
+    void AddCircle(Point center, double radius, string hex, double thickness)
+    {
+        var circle = new Ellipse
+        {
+            Width = radius * 2,
+            Height = radius * 2,
+            Stroke = ColorUtil.ToBrush(hex),
+            StrokeThickness = thickness,
+            Fill = null
+        };
+        Surface.Children.Add(circle);
+        Canvas.SetLeft(circle, center.X - radius);
+        Canvas.SetTop(circle, center.Y - radius);
+    }
+
+    void AddArc(Point center, double radius, double start, double sweep, string hex)
+    {
+        Surface.Children.Add(new Microsoft.UI.Xaml.Shapes.Path
+        {
+            Stroke = ColorUtil.ToBrush(hex),
+            StrokeThickness = Thickness,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            Data = CreateArc(center, radius, start, sweep)
+        });
     }
 
     void AddLabel(RingSegment segment, Point center, double radius, double angle)
@@ -131,14 +160,6 @@ public sealed partial class GoalRing : UserControl
 
     static Geometry CreateArc(Point center, double radius, double start, double sweep)
     {
-        if (sweep >= Math.PI * 2 - 0.001)
-        {
-            var group = new GeometryGroup();
-            group.Children.Add(CreateArc(center, radius, start, Math.PI));
-            group.Children.Add(CreateArc(center, radius, start + Math.PI, Math.PI - 0.001));
-            return group;
-        }
-
         var figure = new PathFigure
         {
             StartPoint = OnCircle(center, radius, start),
@@ -155,6 +176,8 @@ public sealed partial class GoalRing : UserControl
         geometry.Figures.Add(figure);
         return geometry;
     }
+
+    static bool IsTrack(string hex) => TrackColors.Contains(hex);
 
     static Point OnCircle(Point center, double radius, double angle)
         => new(center.X + radius * Math.Cos(angle), center.Y + radius * Math.Sin(angle));

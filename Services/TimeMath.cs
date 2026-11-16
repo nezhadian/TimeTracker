@@ -82,4 +82,11 @@ public static class TimeMath
             return $"{(int)Math.Round(hours)}h";
         return hours.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "h";
     }
+
+    public static string FormatGoalNumber(double hours)
+    {
+        if (Math.Abs(hours - Math.Round(hours)) < 0.001)
+            return ((int)Math.Round(hours)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return hours.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    }
 }

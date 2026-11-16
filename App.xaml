@@ -10,6 +10,8 @@
         <controls:XamlControlsResources />
       </ResourceDictionary.MergedDictionaries>
       <conv:HexToBrushConverter x:Key="HexBrush"/>
+      <conv:BoolToVisibilityConverter x:Key="BoolVis"/>
+      <conv:BoolToVisibilityConverter x:Key="BoolVisInvert" Invert="True"/>
     </ResourceDictionary>
   </Application.Resources>
 </Application>

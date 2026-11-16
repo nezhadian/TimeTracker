@@ -4,167 +4,342 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:TimeTracker.Controls"
     Title="Focus">
-  <ScrollViewer x:Name="Root" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <Grid Margin="24">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-      </Grid.RowDefinitions>
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="20"/>
-        <ColumnDefinition Width="*"/>
-      </Grid.ColumnDefinitions>
+  <Grid x:Name="Root">
+    <NavigationView
+        x:Name="Nav"
+        PaneDisplayMode="Left"
+        IsSettingsVisible="False"
+        IsBackButtonVisible="Collapsed"
+        IsPaneToggleButtonVisible="False"
+        OpenPaneLength="176"
+        CompactPaneLength="56"
+        IsPaneOpen="True"
+        AlwaysShowHeader="False"
+        SelectionChanged="Nav_SelectionChanged">
+      <NavigationView.MenuItems>
+        <NavigationViewItem Content="Focus timer" Tag="focus">
+          <NavigationViewItem.Icon>
+            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8D6;"/>
+          </NavigationViewItem.Icon>
+        </NavigationViewItem>
+        <NavigationViewItem Content="History" Tag="history">
+          <NavigationViewItem.Icon>
+            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE81C;"/>
+          </NavigationViewItem.Icon>
+        </NavigationViewItem>
+      </NavigationView.MenuItems>
 
-      <Border Grid.Row="0" Grid.Column="0" Padding="24"
-              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-              BorderThickness="1" CornerRadius="{ThemeResource ControlCornerRadius}">
-        <Grid>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-          </Grid.RowDefinitions>
-          <TextBlock Text="Focus session" Style="{ThemeResource TitleTextBlockStyle}"/>
+      <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      Visibility="{Binding ShowFocus, Converter={StaticResource BoolVis}}">
+          <Grid Margin="24">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="20"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-          <Grid Grid.Row="1" Width="250" Height="250" HorizontalAlignment="Center" Margin="0,18,0,8">
-            <controls:TickRing ElapsedFraction="{Binding ElapsedFraction}"/>
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
-              <TextBlock Text="{Binding RemainingText}" FontSize="48" FontWeight="Light"
-                         HorizontalAlignment="Center"/>
-              <TextBlock Text="{Binding SessionStatus}" Style="{ThemeResource CaptionTextBlockStyle}"
-                         Height="18" HorizontalAlignment="Center"/>
-            </StackPanel>
+            <Border Grid.Row="0" Grid.Column="0" Padding="24"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="{ThemeResource ControlCornerRadius}">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Focus session" Style="{ThemeResource TitleTextBlockStyle}"/>
+
+                <Grid Grid.Row="1" Width="250" Height="250" HorizontalAlignment="Center" Margin="0,18,0,8">
+                  <controls:TickRing ElapsedFraction="{Binding ElapsedFraction}"/>
+                  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
+                    <TextBlock Text="{Binding RemainingText}" FontSize="48" FontWeight="Light"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding SessionStatus}" Style="{ThemeResource CaptionTextBlockStyle}"
+                               Height="18" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Grid>
+
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,18">
+                  <Button Margin="0,0,12,0"
+                          Command="{Binding ToggleSessionCommand}" IsEnabled="{Binding CanToggleSession}"
+                          ToolTipService.ToolTip="{Binding PrimaryToolTip}"
+                          AutomationProperties.Name="{Binding PrimaryToolTip}">
+                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="{Binding PrimaryGlyph}" FontSize="18"/>
+                  </Button>
+                  <Button ToolTipService.ToolTip="More" AutomationProperties.Name="More">
+                    <Button.Flyout>
+                      <MenuFlyout>
+                        <MenuFlyoutItem Text="End session" Click="EndSession_Click"/>
+                        <MenuFlyoutItem Text="Settings" Click="Settings_Click"/>
+                      </MenuFlyout>
+                    </Button.Flyout>
+                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="16"/>
+                  </Button>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox ItemsSource="{Binding Projects}" SelectedItem="{Binding SelectedProject, Mode=TwoWay}">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                          <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                                     Fill="{Binding Color, Converter={StaticResource HexBrush}}"/>
+                            <TextBlock Text="{Binding Name}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Grid.Column="1" Margin="8,0,0,0"
+                            Command="{Binding OpenProjectsCommand}" ToolTipService.ToolTip="Projects"
+                            AutomationProperties.Name="Projects">
+                      <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14"/>
+                    </Button>
+                  </Grid>
+                  <TextBlock Text="{Binding StoppedTodayText}" Margin="0,14,0,0" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                  <TextBlock Text="{Binding SelectedProjectTodayText}" Margin="0,4,0,0"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Grid.Row="0" Grid.Column="2" Padding="24"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="{ThemeResource ControlCornerRadius}">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid>
+                  <TextBlock Text="Daily progress" Style="{ThemeResource TitleTextBlockStyle}"
+                             VerticalAlignment="Center"/>
+                  <Button HorizontalAlignment="Right"
+                          Command="{Binding OpenSettingsCommand}" ToolTipService.ToolTip="Settings"
+                          AutomationProperties.Name="Settings">
+                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14"/>
+                  </Button>
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="0,12,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="92"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="92"/>
+                  </Grid.ColumnDefinitions>
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Yesterday" Style="{ThemeResource CaptionTextBlockStyle}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding YesterdayText}" FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                  </StackPanel>
+                  <Grid Grid.Column="1" Height="300">
+                    <controls:GoalRing Segments="{Binding RingSegments}" ShowLabels="{Binding ShowRingLabels}"/>
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                      <TextBlock Text="Daily goal" Style="{ThemeResource CaptionTextBlockStyle}"
+                                 HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding GoalHoursNumber}" FontSize="36" FontWeight="SemiBold"
+                                 HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                      <TextBlock Text="hours" Style="{ThemeResource CaptionTextBlockStyle}"
+                                 HorizontalAlignment="Center"/>
+                    </StackPanel>
+                  </Grid>
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="Streak" Style="{ThemeResource CaptionTextBlockStyle}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding StreakText}" FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                  </StackPanel>
+                </Grid>
+
+                <TextBlock Grid.Row="2" Text="{Binding CompletedText}" Margin="0,8,0,0"/>
+              </Grid>
+            </Border>
+
+            <CheckBox Grid.Row="1" Grid.Column="2" Margin="8,14,0,0" Content="Show daily overview"
+                      IsChecked="{Binding ShowDailyOverview, Mode=TwoWay}"/>
+
+            <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,18,0,0" Padding="24"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="{ThemeResource ControlCornerRadius}">
+              <Grid VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="130"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="Break" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                  <TextBox Width="72" Text="{Binding BreakMinutesText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           IsEnabled="{Binding BreakFieldsEnabled}" ToolTipService.ToolTip="Break length in minutes"/>
+                  <TextBlock Text="min" VerticalAlignment="Center" Margin="8,0,0,0" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                </StackPanel>
+                <TextBox Grid.Column="1" Margin="16,0"
+                         Text="{Binding BreakReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding BreakFieldsEnabled}" ToolTipService.ToolTip="Break reason"/>
+                <Button Grid.Column="2" Content="{Binding BreakButtonText}"
+                        Command="{Binding StartOrCancelBreakCommand}" MinWidth="120"/>
+                <TextBlock Grid.Column="3" Text="{Binding BreakRemainingText}" FontSize="28" FontWeight="Light"
+                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
+              </Grid>
+            </Border>
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding ErrorText}"
+                       Foreground="{ThemeResource SystemFillColorCriticalBrush}" Margin="8,10,0,0" TextWrapping="Wrap"/>
           </Grid>
+        </ScrollViewer>
 
-          <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,18">
-            <Button Margin="0,0,12,0"
-                    Command="{Binding ToggleSessionCommand}" IsEnabled="{Binding CanToggleSession}"
-                    ToolTipService.ToolTip="{Binding PrimaryToolTip}"
-                    AutomationProperties.Name="{Binding PrimaryToolTip}">
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="{Binding PrimaryGlyph}" FontSize="18"/>
-            </Button>
-            <Button ToolTipService.ToolTip="More" AutomationProperties.Name="More">
-              <Button.Flyout>
-                <MenuFlyout>
-                  <MenuFlyoutItem Text="End session" Click="EndSession_Click"/>
-                  <MenuFlyoutItem Text="Settings" Click="Settings_Click"/>
-                </MenuFlyout>
-              </Button.Flyout>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="16"/>
-            </Button>
-          </StackPanel>
+        <Grid Margin="16,12,20,16" Visibility="{Binding ShowHistory, Converter={StaticResource BoolVis}}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
 
-          <StackPanel Grid.Row="3">
+          <Border Padding="16,16,8,16"
+                  Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                  BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                  BorderThickness="1" CornerRadius="{ThemeResource ControlCornerRadius}">
             <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-              </Grid.ColumnDefinitions>
-              <ComboBox ItemsSource="{Binding Projects}" SelectedItem="{Binding SelectedProject, Mode=TwoWay}">
-                <ComboBox.ItemTemplate>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <TextBlock Text="Day log" Style="{ThemeResource TitleTextBlockStyle}" Margin="4,0,12,12"/>
+              <ListView Grid.Row="1"
+                        ItemsSource="{Binding HistoryDays}"
+                        SelectedItem="{Binding SelectedHistoryDay, Mode=TwoWay}"
+                        SelectionMode="Single"
+                        Visibility="{Binding HasHistoryDays, Converter={StaticResource BoolVis}}">
+                <ListView.ItemContainerStyle>
+                  <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="8,6"/>
+                    <Setter Property="Margin" Value="0,0,8,4"/>
+                  </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Subtitle}" Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,2,0,0"/>
+                      </StackPanel>
+                      <Border Grid.Column="1" Margin="8,0,0,0" Padding="8,2"
+                              VerticalAlignment="Center"
+                              Background="{ThemeResource AccentFillColorDefaultBrush}"
+                              CornerRadius="8"
+                              Visibility="{Binding HasBadge, Converter={StaticResource BoolVis}}">
+                        <TextBlock Text="{Binding Badge}" FontSize="11"
+                                   Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                      </Border>
+                    </Grid>
+                  </DataTemplate>
+                </ListView.ItemTemplate>
+              </ListView>
+              <TextBlock Grid.Row="1" Text="No days logged yet."
+                         Style="{ThemeResource CaptionTextBlockStyle}"
+                         VerticalAlignment="Center" HorizontalAlignment="Center"
+                         Visibility="{Binding HasHistoryDays, Converter={StaticResource BoolVisInvert}}"/>
+            </Grid>
+          </Border>
+
+          <Border Grid.Column="2" Padding="24"
+                  Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                  BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                  BorderThickness="1" CornerRadius="{ThemeResource ControlCornerRadius}">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+
+              <TextBlock Text="{Binding HistoryDateText}" Style="{ThemeResource TitleTextBlockStyle}" TextWrapping="Wrap"/>
+              <TextBlock Grid.Row="1" Text="{Binding HistorySummaryText}" Margin="0,6,0,0"
+                         Style="{ThemeResource CaptionTextBlockStyle}"/>
+
+              <ScrollViewer Grid.Row="2" Margin="0,14,0,0" HorizontalScrollBarVisibility="Auto"
+                            VerticalScrollBarVisibility="Disabled"
+                            Visibility="{Binding HasHistoryEvents, Converter={StaticResource BoolVis}}">
+              <ItemsControl ItemsSource="{Binding HistoryProjects}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="16"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <StackPanel Orientation="Horizontal">
                       <Ellipse Width="10" Height="10" VerticalAlignment="Center"
                                Fill="{Binding Color, Converter={StaticResource HexBrush}}"/>
                       <TextBlock Text="{Binding Name}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                      <TextBlock Text="{Binding DurationText}" Margin="8,0,0,0" VerticalAlignment="Center"
+                                 Style="{ThemeResource CaptionTextBlockStyle}"/>
                     </StackPanel>
                   </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <Button Grid.Column="1" Margin="8,0,0,0"
-                      Command="{Binding OpenProjectsCommand}" ToolTipService.ToolTip="Projects"
-                      AutomationProperties.Name="Projects">
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14"/>
-              </Button>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              </ScrollViewer>
+
+              <controls:DayTimelineBar Grid.Row="3" Margin="0,16,0,8" Height="18"
+                                       Segments="{Binding HistoryBarItems}"
+                                       Visibility="{Binding HasHistoryEvents, Converter={StaticResource BoolVis}}"/>
+
+              <ScrollViewer x:Name="HistoryTimelineScroll" Grid.Row="4" VerticalScrollBarVisibility="Auto"
+                            Visibility="{Binding HasHistoryEvents, Converter={StaticResource BoolVis}}">
+                <ItemsControl ItemsSource="{Binding HistoryEvents}" Margin="0,4,0,20">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Grid Margin="0,0,12,12">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="4"/>
+                          <ColumnDefinition Width="14"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{Binding Color, Converter={StaticResource HexBrush}}" CornerRadius="2"/>
+                        <StackPanel Grid.Column="2">
+                          <TextBlock Text="{Binding TimeRangeText}" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                          <TextBlock Text="{Binding Reason}" Margin="0,2,0,0"
+                                     Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.85"
+                                     Visibility="{Binding HasReason, Converter={StaticResource BoolVis}}"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="3" Text="{Binding DurationText}"
+                                   VerticalAlignment="Center" Margin="16,0,0,0"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+
+              <TextBlock Grid.Row="4" Text="No activity in this day's log."
+                         Style="{ThemeResource CaptionTextBlockStyle}"
+                         VerticalAlignment="Center" HorizontalAlignment="Center"
+                         Visibility="{Binding ShowEmptyDayLog, Converter={StaticResource BoolVis}}"/>
             </Grid>
-            <TextBlock Text="{Binding StoppedTodayText}" Margin="0,14,0,0" Style="{ThemeResource CaptionTextBlockStyle}"/>
-            <TextBlock Text="{Binding SelectedProjectTodayText}" Margin="0,4,0,0"/>
-          </StackPanel>
+          </Border>
         </Grid>
-      </Border>
-
-      <Border Grid.Row="0" Grid.Column="2" Padding="24"
-              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-              BorderThickness="1" CornerRadius="{ThemeResource ControlCornerRadius}">
-        <Grid>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-          </Grid.RowDefinitions>
-          <Grid>
-            <TextBlock Text="Daily progress" Style="{ThemeResource TitleTextBlockStyle}"
-                       VerticalAlignment="Center"/>
-            <Button HorizontalAlignment="Right"
-                    Command="{Binding OpenSettingsCommand}" ToolTipService.ToolTip="Settings"
-                    AutomationProperties.Name="Settings">
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14"/>
-            </Button>
-          </Grid>
-
-          <Grid Grid.Row="1" Margin="0,12,0,8">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="92"/>
-              <ColumnDefinition Width="*"/>
-              <ColumnDefinition Width="92"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel VerticalAlignment="Center">
-              <TextBlock Text="Yesterday" Style="{ThemeResource CaptionTextBlockStyle}" HorizontalAlignment="Center"/>
-              <TextBlock Text="{Binding YesterdayText}" FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-            </StackPanel>
-            <Grid Grid.Column="1" Height="300">
-              <controls:GoalRing Segments="{Binding RingSegments}" ShowLabels="{Binding ShowRingLabels}"/>
-              <TextBlock Text="{Binding GoalCenterText}" FontSize="28" FontWeight="SemiBold"
-                         HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
-            </Grid>
-            <StackPanel Grid.Column="2" VerticalAlignment="Center">
-              <TextBlock Text="Streak" Style="{ThemeResource CaptionTextBlockStyle}" HorizontalAlignment="Center"/>
-              <TextBlock Text="{Binding StreakText}" FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-            </StackPanel>
-          </Grid>
-
-          <TextBlock Grid.Row="2" Text="{Binding CompletedText}" Margin="0,8,0,0"/>
-        </Grid>
-      </Border>
-
-      <CheckBox Grid.Row="1" Grid.Column="2" Margin="8,14,0,0" Content="Show daily overview"
-                IsChecked="{Binding ShowDailyOverview, Mode=TwoWay}"/>
-
-      <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,18,0,0" Padding="24"
-              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-              BorderThickness="1" CornerRadius="{ThemeResource ControlCornerRadius}">
-        <Grid VerticalAlignment="Center">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="130"/>
-          </Grid.ColumnDefinitions>
-          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <TextBlock Text="Break" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center" Margin="0,0,16,0"/>
-            <TextBox Width="72" Text="{Binding BreakMinutesText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     IsEnabled="{Binding BreakFieldsEnabled}" ToolTipService.ToolTip="Break length in minutes"/>
-            <TextBlock Text="min" VerticalAlignment="Center" Margin="8,0,0,0" Style="{ThemeResource CaptionTextBlockStyle}"/>
-          </StackPanel>
-          <TextBox Grid.Column="1" Margin="16,0"
-                   Text="{Binding BreakReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                   IsEnabled="{Binding BreakFieldsEnabled}" ToolTipService.ToolTip="Break reason"/>
-          <Button Grid.Column="2" Content="{Binding BreakButtonText}"
-                  Command="{Binding StartOrCancelBreakCommand}" MinWidth="120"/>
-          <TextBlock Grid.Column="3" Text="{Binding BreakRemainingText}" FontSize="28" FontWeight="Light"
-                     HorizontalAlignment="Right" VerticalAlignment="Center"/>
-        </Grid>
-      </Border>
-
-      <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding ErrorText}"
-                 Foreground="{ThemeResource SystemFillColorCriticalBrush}" Margin="8,10,0,0" TextWrapping="Wrap"/>
-    </Grid>
-  </ScrollViewer>
+      </Grid>
+    </NavigationView>
+  </Grid>
 </Window>
