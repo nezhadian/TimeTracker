@@ -24,6 +24,7 @@ public partial class App : Application
         if (!store.TryLoadExistingFolder())
         {
             var setup = new SettingsWindow(store, firstRun: true, activeProjectId: null);
+            SingleInstance.Bind(setup);
             if (!await setup.ShowModalAsync())
             {
                 Exit();
@@ -34,6 +35,7 @@ public partial class App : Application
         var viewModel = new MainViewModel(store, new SessionClock(store), new AlarmPlayer());
         _window = new MainWindow(viewModel);
         Main = (MainWindow)_window;
+        SingleInstance.Bind(_window);
         _window.Activate();
     }
 

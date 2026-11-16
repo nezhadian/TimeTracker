@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -33,4 +34,54 @@ public static class WindowHelper
             };
         }
     }
+
+    public static void BringToFront(Window window)
+    {
+        window.Activate();
+        var hwnd = WindowNative.GetWindowHandle(window);
+        if (hwnd == IntPtr.Zero)
+            return;
+
+        if (IsIconic(hwnd))
+            ShowWindow(hwnd, SwRestore);
+
+        var foreground = GetForegroundWindow();
+        var thisThread = GetCurrentThreadId();
+        var foregroundThread = GetWindowThreadProcessId(foreground, out _);
+        if (foregroundThread != thisThread)
+            AttachThreadInput(foregroundThread, thisThread, true);
+
+        ShowWindow(hwnd, SwRestore);
+        SetForegroundWindow(hwnd);
+        BringWindowToTop(hwnd);
+
+        if (foregroundThread != thisThread)
+            AttachThreadInput(foregroundThread, thisThread, false);
+    }
+
+    const int SwRestore = 9;
+
+    [DllImport("user32.dll")]
+    static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
+
+    [DllImport("kernel32.dll")]
+    static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 }

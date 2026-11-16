@@ -120,8 +120,6 @@
                       <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14"/>
                     </Button>
                   </Grid>
-                  <TextBlock Text="{Binding StoppedTodayText}" Margin="0,14,0,0" Style="{ThemeResource CaptionTextBlockStyle}"/>
-                  <TextBlock Text="{Binding SelectedProjectTodayText}" Margin="0,4,0,0"/>
                 </StackPanel>
               </Grid>
             </Border>
@@ -147,30 +145,15 @@
                   </Button>
                 </Grid>
 
-                <Grid Grid.Row="1" Margin="0,12,0,8">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="92"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="92"/>
-                  </Grid.ColumnDefinitions>
-                  <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Yesterday" Style="{ThemeResource CaptionTextBlockStyle}" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding YesterdayText}" FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                  </StackPanel>
-                  <Grid Grid.Column="1" Height="300">
-                    <controls:GoalRing Segments="{Binding RingSegments}" ShowLabels="{Binding ShowRingLabels}"/>
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
-                      <TextBlock Text="Daily goal" Style="{ThemeResource CaptionTextBlockStyle}"
-                                 HorizontalAlignment="Center"/>
-                      <TextBlock Text="{Binding GoalHoursNumber}" FontSize="36" FontWeight="SemiBold"
-                                 HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                      <TextBlock Text="hours" Style="{ThemeResource CaptionTextBlockStyle}"
-                                 HorizontalAlignment="Center"/>
-                    </StackPanel>
-                  </Grid>
-                  <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="Streak" Style="{ThemeResource CaptionTextBlockStyle}" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding StreakText}" FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                <Grid Grid.Row="1" Margin="0,12,0,8" Height="300">
+                  <controls:GoalRing Segments="{Binding RingSegments}" ShowLabels="{Binding ShowRingLabels}"/>
+                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                    <TextBlock Text="Daily goal" Style="{ThemeResource CaptionTextBlockStyle}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding GoalHoursNumber}" FontSize="36" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock Text="hours" Style="{ThemeResource CaptionTextBlockStyle}"
+                               HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Grid>
 

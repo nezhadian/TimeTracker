@@ -64,12 +64,6 @@ public partial class MainViewModel : ObservableObject
     private string _sessionStatus = "";
 
     [ObservableProperty]
-    private string _stoppedTodayText = "Stopped today: 0m";
-
-    [ObservableProperty]
-    private string _selectedProjectTodayText = "Default today: 0m";
-
-    [ObservableProperty]
     private string _primaryGlyph = "\uE768";
 
     [ObservableProperty]
@@ -80,12 +74,6 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _showResetButton;
-
-    [ObservableProperty]
-    private string _yesterdayText = "0m";
-
-    [ObservableProperty]
-    private string _streakText = "0";
 
     [ObservableProperty]
     private string _goalCenterText = "12h";
@@ -514,7 +502,6 @@ public partial class MainViewModel : ObservableObject
         var settings = _store.Settings;
         var session = _clock.State.Session;
         var slices = TodaySlices(now);
-        var stopped = StoppedToday(now);
 
         if (session is null)
         {
@@ -543,17 +530,6 @@ public partial class MainViewModel : ObservableObject
             ShowResetButton = _clock.IsPaused && !_clock.IsBreakActive;
         }
 
-        StoppedTodayText = "Stopped today: " + TimeMath.FormatShort(stopped);
-        var selectedSeconds = SelectedProject is null
-            ? 0
-            : slices.Where(slice => slice.ProjectId == SelectedProject.Id).Sum(slice => slice.Seconds);
-        var selectedName = SelectedProject?.Name ?? "Project";
-        SelectedProjectTodayText = $"{selectedName} today: {TimeMath.FormatShort(selectedSeconds)}";
-
-        var today = TimeMath.LocalDate(now);
-        YesterdayText = TimeMath.FormatShort(_store.ClosedWork(today.AddDays(-1)));
-        var todayWork = slices.Sum(slice => slice.Seconds);
-        StreakText = _store.ComputeStreak(today, todayWork, settings.DailyGoalHours).ToString();
         GoalCenterText = TimeMath.FormatGoal(settings.DailyGoalHours);
         GoalHoursNumber = TimeMath.FormatGoalNumber(settings.DailyGoalHours);
         BreakButtonText = _clock.IsBreakActive ? "Cancel break" : "Start break";
@@ -594,21 +570,6 @@ public partial class MainViewModel : ObservableObject
         if (_clock.CurrentOpenSlice(now) is { } open && TimeMath.LocalDate(open.Start) == today)
             slices.Add(open);
         return slices;
-    }
-
-    long StoppedToday(DateTimeOffset now)
-    {
-        var today = TimeMath.LocalDate(now);
-        var dayStart = TimeMath.LocalDayStart(today);
-        var dayEnd = TimeMath.NextLocalMidnight(dayStart);
-        var total = _store.LoadDay(today).Stops.Where(stop => !stop.Open).Sum(stop => stop.Seconds);
-        if (_clock.CurrentOpenStop(now) is { } open)
-        {
-            var end = open.End ?? now;
-            total += TimeMath.Overlap(open.Start, end, dayStart, dayEnd);
-        }
-
-        return total;
     }
 
     void AlertIfSessionJustCompleted(bool wasComplete)
