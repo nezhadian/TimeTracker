@@ -7,6 +7,7 @@ public sealed class LiveSession
     public string ProjectColor { get; set; } = "#2EE59D";
     public int PlannedSeconds { get; set; }
     public long CompletedSeconds { get; set; }
+    public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? SliceStart { get; set; }
     public DateTimeOffset? PauseStart { get; set; }
     public string? PauseKind { get; set; }

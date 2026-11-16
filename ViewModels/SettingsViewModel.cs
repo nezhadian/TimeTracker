@@ -102,13 +102,36 @@ public partial class SettingsViewModel : ObservableObject
             return false;
         }
 
+        if (!TryBuildProjects(out var savedProjects))
+            return false;
+
+        return Save(sessionLength, threshold, dailyGoal, DataFolder.Trim(), savedProjects);
+    }
+
+    public bool TrySaveProjects()
+    {
+        ErrorText = "";
+        if (!TryBuildProjects(out var savedProjects))
+            return false;
+
+        var current = _store.Settings;
+        return Save(
+            current.SessionLengthMinutes,
+            current.ReasonThresholdMinutes,
+            current.DailyGoalHours,
+            _store.DataFolder ?? DataFolder,
+            savedProjects);
+    }
+
+    bool TryBuildProjects(out List<Project> savedProjects)
+    {
+        savedProjects = [];
         if (Projects.Count == 0)
         {
             ErrorText = "Keep at least one project.";
             return false;
         }
 
-        var savedProjects = new List<Project>();
         foreach (var row in Projects)
         {
             var name = row.Name.Trim();
@@ -151,6 +174,11 @@ public partial class SettingsViewModel : ObservableObject
             return false;
         }
 
+        return true;
+    }
+
+    bool Save(int sessionLength, int threshold, double dailyGoal, string folder, List<Project> savedProjects)
+    {
         var settings = new TrackerSettings
         {
             SessionLengthMinutes = sessionLength,
@@ -162,7 +190,6 @@ public partial class SettingsViewModel : ObservableObject
 
         try
         {
-            var folder = DataFolder.Trim();
             var switching = !_store.HasDataFolder
                 || !string.Equals(_store.DataFolder, folder, StringComparison.OrdinalIgnoreCase);
             var destinationHasHistory = File.Exists(Path.Combine(folder, "settings.json"));

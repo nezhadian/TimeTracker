@@ -31,7 +31,21 @@ public partial class MainWindow : Window
     {
         if (sender is not Button button || button.ContextMenu is null)
             return;
-        button.ContextMenu.PlacementTarget = button;
-        button.ContextMenu.IsOpen = true;
+
+        var menu = button.ContextMenu;
+        menu.PlacementTarget = button;
+        Dispatcher.BeginInvoke(new Action(() => menu.IsOpen = true));
+    }
+
+    void EndSession_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel)
+            viewModel.EndSessionCommand.Execute(null);
+    }
+
+    void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel)
+            viewModel.OpenSettingsCommand.Execute(null);
     }
 }

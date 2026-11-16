@@ -11,19 +11,31 @@ namespace TimeTracker.Views;
 public partial class SettingsWindow : Window
 {
     readonly SettingsViewModel _viewModel;
+    readonly bool _projectsOnly;
 
-    public SettingsWindow(TimeStore store, bool firstRun, string? activeProjectId)
+    public SettingsWindow(TimeStore store, bool firstRun, string? activeProjectId, bool projectsOnly = false)
     {
         InitializeComponent();
+        _projectsOnly = projectsOnly;
         _viewModel = new SettingsViewModel(store, firstRun, activeProjectId);
         DataContext = _viewModel;
-        if (firstRun)
-            Title = "Choose where to save";
+        if (projectsOnly)
+        {
+            Title = "Projects";
+            GeneralSettings.Visibility = Visibility.Collapsed;
+            ProjectSettings.Margin = new Thickness(0);
+        }
+        else
+        {
+            ProjectSettings.Visibility = Visibility.Collapsed;
+            if (firstRun)
+                Title = "Choose where to save";
+        }
     }
 
     void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (_viewModel.TrySave())
+        if (_projectsOnly ? _viewModel.TrySaveProjects() : _viewModel.TrySave())
             DialogResult = true;
     }
 

@@ -56,9 +56,6 @@ public partial class MainViewModel : ObservableObject
     private bool _canToggleSession = true;
 
     [ObservableProperty]
-    private bool _canEndSession;
-
-    [ObservableProperty]
     private string _yesterdayText = "0m";
 
     [ObservableProperty]
@@ -164,7 +161,7 @@ public partial class MainViewModel : ObservableObject
         Refresh();
     }
 
-    [RelayCommand(CanExecute = nameof(CanEnd))]
+    [RelayCommand]
     void EndSession()
     {
         var now = DateTimeOffset.Now;
@@ -183,10 +180,15 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void OpenSettings()
+    void OpenSettings() => OpenSettingsWindow(projectsOnly: false);
+
+    [RelayCommand]
+    void OpenProjects() => OpenSettingsWindow(projectsOnly: true);
+
+    void OpenSettingsWindow(bool projectsOnly)
     {
         var activeId = _clock.State.Session?.ProjectId;
-        var window = new SettingsWindow(_store, firstRun: false, activeId)
+        var window = new SettingsWindow(_store, firstRun: false, activeId, projectsOnly)
         {
             Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(item => item.IsActive)
                      ?? Application.Current?.MainWindow
@@ -225,7 +227,23 @@ public partial class MainViewModel : ObservableObject
     {
         if (_suppress > 0 || value is null)
             return;
-        _clock.ChangeProject(value, DateTimeOffset.Now);
+
+        var session = _clock.State.Session;
+        if (session is null || session.ProjectId == value.Id)
+            return;
+
+        var choice = AskProjectChange(value.Name);
+        if (choice is null)
+        {
+            RevertProject(session.ProjectId);
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        if (choice == ProjectChangeChoice.MoveElapsed)
+            _clock.MoveSessionToProject(value, now);
+        else
+            _clock.RestartSessionOnProject(value, now);
         Refresh();
     }
 
@@ -239,9 +257,28 @@ public partial class MainViewModel : ObservableObject
         UpdateRing(DateTimeOffset.Now, TodaySlices(DateTimeOffset.Now));
     }
 
-    partial void OnCanEndSessionChanged(bool value) => EndSessionCommand.NotifyCanExecuteChanged();
+    void RevertProject(string projectId)
+    {
+        _suppress++;
+        try
+        {
+            SelectedProject = Projects.FirstOrDefault(project => project.Id == projectId) ?? SelectedProject;
+        }
+        finally
+        {
+            _suppress--;
+        }
+    }
 
-    bool CanEnd() => CanEndSession;
+    ProjectChangeChoice? AskProjectChange(string projectName)
+    {
+        var dialog = new ProjectChangeDialog(projectName)
+        {
+            Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(item => item.IsActive)
+                    ?? Application.Current?.MainWindow
+        };
+        return dialog.ShowDialog() == true ? dialog.Choice : null;
+    }
 
     bool Resume(DateTimeOffset now)
     {
@@ -324,7 +361,6 @@ public partial class MainViewModel : ObservableObject
             CanToggleSession = !_clock.IsBreakActive;
         }
 
-        CanEndSession = session is not null;
         StoppedTodayText = "Stopped today: " + TimeMath.FormatShort(stopped);
         var selectedSeconds = SelectedProject is null
             ? 0

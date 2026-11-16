@@ -55,9 +55,9 @@
             <Button Style="{StaticResource CircleButton}" Background="#F3F4F6" Click="OpenMore" ToolTip="More"
                     AutomationProperties.Name="More">
               <Button.ContextMenu>
-                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                  <MenuItem Header="End session" Command="{Binding EndSessionCommand}"/>
-                  <MenuItem Header="Settings" Command="{Binding OpenSettingsCommand}"/>
+                <ContextMenu>
+                  <MenuItem Header="End session" Click="EndSession_Click"/>
+                  <MenuItem Header="Settings" Click="Settings_Click"/>
                 </ContextMenu>
               </Button.ContextMenu>
               <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="16" Foreground="#111827"/>
@@ -65,18 +65,28 @@
           </StackPanel>
 
           <StackPanel Grid.Row="3">
-            <ComboBox ItemsSource="{Binding Projects}" SelectedItem="{Binding SelectedProject}" Height="38"
-                      VerticalContentAlignment="Center" Padding="8,0">
-              <ComboBox.ItemTemplate>
-                <DataTemplate>
-                  <StackPanel Orientation="Horizontal">
-                    <Ellipse Width="10" Height="10" VerticalAlignment="Center"
-                             Fill="{Binding Color, Converter={StaticResource HexBrush}}"/>
-                    <TextBlock Text="{Binding Name}" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                  </StackPanel>
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <ComboBox ItemsSource="{Binding Projects}" SelectedItem="{Binding SelectedProject}" Height="38"
+                        VerticalContentAlignment="Center" Padding="8,0">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                      <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                               Fill="{Binding Color, Converter={StaticResource HexBrush}}"/>
+                      <TextBlock Text="{Binding Name}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <Button Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource IconButton}"
+                      Command="{Binding OpenProjectsCommand}" ToolTip="Projects" AutomationProperties.Name="Projects">
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14" Foreground="#111827"/>
+              </Button>
+            </Grid>
             <TextBlock Text="{Binding StoppedTodayText}" Margin="0,14,0,0" Foreground="#6B7280" FontSize="13"/>
             <TextBlock Text="{Binding SelectedProjectTodayText}" Margin="0,4,0,0" Foreground="#111827" FontSize="14"/>
           </StackPanel>

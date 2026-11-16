@@ -48,6 +48,7 @@ public sealed class SessionClock
             ProjectName = project.Name,
             ProjectColor = project.Color,
             PlannedSeconds = plannedSeconds,
+            StartedAt = now,
             SliceStart = now
         };
         Persist(now);
@@ -129,26 +130,46 @@ public sealed class SessionClock
         return ClockAction.Done;
     }
 
-    public void ChangeProject(Project project, DateTimeOffset now)
+    public void MoveSessionToProject(Project project, DateTimeOffset now)
     {
         var session = State.Session;
         if (session is null || session.ProjectId == project.Id)
             return;
 
-        if (session.SliceStart is not null)
-        {
-            CatchUp(now);
-            if (State.Session?.SliceStart is not null)
-                CloseOpenSlice(now);
-            if (State.Session is not LiveSession stillRunning)
-                return;
-            session = stillRunning;
-            session.SliceStart = now;
-        }
-
+        var began = SessionBegan(session, now);
+        ReassignSessionSlices(project, began);
         session.ProjectId = project.Id;
         session.ProjectName = project.Name;
         session.ProjectColor = project.Color;
+        Persist(now);
+    }
+
+    public void RestartSessionOnProject(Project project, DateTimeOffset now)
+    {
+        var session = State.Session;
+        if (session is null)
+            return;
+
+        var planned = session.PlannedSeconds;
+        var onBreak = IsBreakActive;
+        if (session.SliceStart is not null)
+            CloseOpenSlice(now);
+        if (State.Session?.PauseStart is not null)
+            CloseOpenPause(now);
+
+        State.Session = new LiveSession
+        {
+            ProjectId = project.Id,
+            ProjectName = project.Name,
+            ProjectColor = project.Color,
+            PlannedSeconds = planned,
+            StartedAt = now,
+            SliceStart = onBreak ? null : now,
+            PauseStart = onBreak ? now : null,
+            PauseKind = onBreak ? "break" : null,
+            PauseReason = onBreak ? State.Break?.Reason : null,
+            ReasonCaptured = onBreak
+        };
         Persist(now);
     }
 
@@ -411,6 +432,34 @@ public sealed class SessionClock
         if (session.ReasonCaptured || session.PauseStart is null)
             return false;
         return TimeMath.SecondsBetween(session.PauseStart.Value, now) > thresholdSeconds;
+    }
+
+    static DateTimeOffset SessionBegan(LiveSession session, DateTimeOffset now)
+        => session.StartedAt != default ? session.StartedAt : session.SliceStart ?? session.PauseStart ?? now;
+
+    void ReassignSessionSlices(Project project, DateTimeOffset began)
+    {
+        var dates = new[] { TimeMath.LocalDate(began), TimeMath.LocalDate(DateTimeOffset.Now) };
+        foreach (var date in dates.Distinct())
+        {
+            if (!_store.DayExists(date))
+                continue;
+
+            var day = _store.LoadDay(date);
+            var changed = false;
+            foreach (var slice in day.Slices)
+            {
+                if (slice.Start < began)
+                    continue;
+                slice.ProjectId = project.Id;
+                slice.Name = project.Name;
+                slice.Color = project.Color;
+                changed = true;
+            }
+
+            if (changed)
+                _store.SaveDay(day);
+        }
     }
 
     void ApplyProjectMeta(LiveSession session)

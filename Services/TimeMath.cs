@@ -53,11 +53,16 @@ public static class TimeMath
 
     public static string FormatShort(long seconds)
     {
-        if (seconds < 60)
+        if (seconds <= 0)
             return "0m";
         var hours = seconds / 3600;
         var minutes = seconds % 3600 / 60;
-        return hours > 0 ? $"{hours}h {minutes}m" : $"{minutes}m";
+        var remaining = seconds % 60;
+        if (hours > 0)
+            return remaining > 0 ? $"{hours}h {minutes}m {remaining}s" : minutes > 0 ? $"{hours}h {minutes}m" : $"{hours}h";
+        if (minutes > 0)
+            return remaining > 0 ? $"{minutes}m {remaining}s" : $"{minutes}m";
+        return $"{remaining}s";
     }
 
     public static string FormatCompleted(long seconds)
@@ -66,7 +71,9 @@ public static class TimeMath
             seconds = 0;
         var hours = seconds / 3600;
         var minutes = seconds % 3600 / 60;
-        return $"Completed: {hours} hours, {minutes} minutes";
+        var remaining = seconds % 60;
+        var text = $"Completed: {hours} hours, {minutes} minutes";
+        return remaining > 0 ? $"{text}, {remaining} seconds" : text;
     }
 
     public static string FormatGoal(double hours)

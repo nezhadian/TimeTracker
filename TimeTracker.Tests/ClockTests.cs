@@ -102,17 +102,30 @@ public class ClockTests : IDisposable
     }
 
     [Fact]
-    public void Changing_project_splits_the_slice_on_the_timestamp()
+    public void Moving_a_session_gives_the_elapsed_time_to_the_new_project()
     {
         var start = Local(11, 0);
         _clock.StartSession(_alpha, 40 * 60, start);
-        _clock.ChangeProject(_beta, start.AddSeconds(100));
-        _clock.Pause(start.AddSeconds(250));
+        _clock.MoveSessionToProject(_beta, start.AddSeconds(100));
+        _clock.Pause(start.AddSeconds(100));
 
-        var slices = _store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Slices.Where(slice => !slice.Open).ToList();
-        Assert.Equal(2, slices.Count);
-        Assert.Equal(("alpha", 100L), (slices[0].ProjectId, slices[0].Seconds));
-        Assert.Equal(("beta", 150L), (slices[1].ProjectId, slices[1].Seconds));
+        var slice = Assert.Single(_store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Slices, item => !item.Open);
+        Assert.Equal("beta", slice.ProjectId);
+        Assert.Equal(100, slice.Seconds);
+        Assert.Equal(40 * 60 - 100, _clock.SessionRemainingSeconds(start.AddSeconds(100)));
+    }
+
+    [Fact]
+    public void Restarting_on_a_project_keeps_the_old_time_and_resets_the_clock()
+    {
+        var start = Local(11, 0);
+        _clock.StartSession(_alpha, 40 * 60, start);
+        _clock.RestartSessionOnProject(_beta, start.AddSeconds(100));
+
+        Assert.Equal("beta", _clock.State.Session!.ProjectId);
+        Assert.Equal(40 * 60, _clock.SessionRemainingSeconds(start.AddSeconds(100)));
+        var kept = Assert.Single(_store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Slices, item => !item.Open);
+        Assert.Equal(("alpha", 100L), (kept.ProjectId, kept.Seconds));
     }
 
     [Fact]
