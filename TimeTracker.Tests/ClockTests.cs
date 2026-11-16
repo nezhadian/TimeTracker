@@ -129,18 +129,126 @@ public class ClockTests : IDisposable
     }
 
     [Fact]
-    public void Hitting_zero_keeps_only_the_planned_time()
+    public void Changing_project_under_the_threshold_brings_elapsed_time()
+    {
+        var start = Local(11, 0);
+        _clock.StartSession(_alpha, 40 * 60, start);
+        _clock.CatchUp(start.AddMinutes(2));
+        Assert.True(_clock.SessionElapsedSeconds(start.AddMinutes(2)) <= 180);
+        _clock.MoveSessionToProject(_beta, start.AddMinutes(2));
+        _clock.Pause(start.AddMinutes(2));
+
+        var slice = Assert.Single(_store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Slices, item => !item.Open);
+        Assert.Equal("beta", slice.ProjectId);
+        Assert.Equal(120, slice.Seconds);
+        Assert.Equal("beta", _clock.State.Session!.ProjectId);
+    }
+
+    [Fact]
+    public void Changing_project_over_the_threshold_keeps_old_time_when_starting_from_zero()
+    {
+        var start = Local(11, 0);
+        _clock.StartSession(_alpha, 40 * 60, start);
+        _clock.CatchUp(start.AddMinutes(4));
+        Assert.True(_clock.SessionElapsedSeconds(start.AddMinutes(4)) > 180);
+        _clock.RestartSessionOnProject(_beta, start.AddMinutes(4));
+
+        Assert.Equal("beta", _clock.State.Session!.ProjectId);
+        Assert.Equal(40 * 60, _clock.SessionRemainingSeconds(start.AddMinutes(4)));
+        var kept = Assert.Single(_store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Slices, item => !item.Open);
+        Assert.Equal(("alpha", 240L), (kept.ProjectId, kept.Seconds));
+    }
+
+    [Fact]
+    public void Hitting_zero_keeps_only_the_planned_work_and_counts_overrun_as_a_stop()
     {
         var start = Local(8, 0);
+        var later = start.AddHours(2);
         _clock.StartSession(_alpha, 40 * 60, start);
-        _clock.CatchUp(start.AddHours(2));
-        _clock.Persist(start.AddHours(2));
+        _clock.CatchUp(later);
+        _clock.Persist(later);
 
-        Assert.Null(_clock.State.Session);
-        var slice = Assert.Single(_store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Slices);
+        Assert.True(_clock.IsPaused);
+        Assert.True(_clock.IsSessionComplete);
+        Assert.Equal(0, _clock.SessionRemainingSeconds(later));
+        var day = _store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime));
+        var slice = Assert.Single(day.Slices);
         Assert.Equal(2400, slice.Seconds);
         Assert.False(slice.Open);
         Assert.Equal(start.AddMinutes(40), slice.End);
+        var stop = Assert.Single(day.Stops);
+        Assert.Equal("pause", stop.Kind);
+        Assert.Equal(start.AddMinutes(40), stop.Start);
+        Assert.True(stop.Open);
+        Assert.Equal(80 * 60, stop.Seconds);
+    }
+
+    [Fact]
+    public void Completing_a_session_asks_for_a_reason_after_the_stop_threshold()
+    {
+        var start = Local(8, 0);
+        _clock.StartSession(_alpha, 60, start);
+        _clock.CatchUp(start.AddMinutes(5));
+        Assert.True(_clock.PauseNeedsReason(start.AddMinutes(5), thresholdSeconds: 180));
+        Assert.Equal(ClockAction.NeedReason, _clock.TryResume(start.AddMinutes(5), null, thresholdSeconds: 180));
+        Assert.Equal(ClockAction.Done, _clock.TryResume(start.AddMinutes(5), "done", thresholdSeconds: 180));
+        Assert.Null(_clock.State.Session);
+        var stop = Assert.Single(_store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Stops, item => !item.Open);
+        Assert.Equal("done", stop.Reason);
+        Assert.Equal(4 * 60, stop.Seconds);
+    }
+
+    [Fact]
+    public void Completing_a_session_under_the_threshold_does_not_ask_for_a_reason()
+    {
+        var start = Local(8, 0);
+        _clock.StartSession(_alpha, 60, start);
+        var resumeAt = start.AddMinutes(2);
+        _clock.CatchUp(resumeAt);
+        Assert.False(_clock.PauseNeedsReason(resumeAt, thresholdSeconds: 180));
+        Assert.Equal(ClockAction.Done, _clock.TryResume(resumeAt, null, thresholdSeconds: 180));
+        Assert.Null(_clock.State.Session);
+        var stop = Assert.Single(_store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Stops, item => !item.Open);
+        Assert.Equal("", stop.Reason);
+        Assert.Equal(60, stop.Seconds);
+    }
+
+    [Fact]
+    public void Ending_a_paused_session_uses_the_stop_threshold()
+    {
+        var start = Local(8, 0);
+        _clock.StartSession(_alpha, 40 * 60, start);
+        _clock.Pause(start.AddMinutes(1));
+        Assert.Equal(ClockAction.Done, _clock.EndSession(start.AddMinutes(3), null, thresholdSeconds: 180));
+        Assert.Null(_clock.State.Session);
+
+        _clock.StartSession(_alpha, 40 * 60, start.AddMinutes(4));
+        _clock.Pause(start.AddMinutes(5));
+        Assert.Equal(ClockAction.NeedReason, _clock.EndSession(start.AddMinutes(9), null, thresholdSeconds: 180));
+        Assert.Equal(ClockAction.Done, _clock.EndSession(start.AddMinutes(9), "done for today", thresholdSeconds: 180));
+        var stop = Assert.Single(
+            _store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Stops,
+            item => item.Reason == "done for today");
+        Assert.Equal(4 * 60, stop.Seconds);
+    }
+
+    [Fact]
+    public void Ending_a_completed_session_uses_the_stop_threshold()
+    {
+        var start = Local(8, 0);
+        _clock.StartSession(_alpha, 60, start);
+        _clock.CatchUp(start.AddMinutes(2));
+        Assert.Equal(ClockAction.Done, _clock.EndSession(start.AddMinutes(2), null, thresholdSeconds: 180));
+        Assert.Null(_clock.State.Session);
+
+        _clock.StartSession(_alpha, 60, start.AddMinutes(3));
+        _clock.CatchUp(start.AddMinutes(8));
+        Assert.Equal(ClockAction.NeedReason, _clock.EndSession(start.AddMinutes(8), null, thresholdSeconds: 180));
+        Assert.Equal(ClockAction.Done, _clock.EndSession(start.AddMinutes(8), "wrap up", thresholdSeconds: 180));
+        var stop = Assert.Single(
+            _store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Stops,
+            item => item.Reason == "wrap up");
+        Assert.Equal(4 * 60, stop.Seconds);
     }
 
     [Fact]
@@ -279,6 +387,31 @@ public class ClockTests : IDisposable
         Assert.Equal(3, store.Settings.ReasonThresholdMinutes);
         Assert.Equal(12, store.Settings.DailyGoalHours);
         Assert.False(store.Settings.ShowDailyOverview);
+        Assert.Empty(store.Settings.BreakReasons);
+    }
+
+    [Fact]
+    public void Break_reasons_are_remembered_newest_first_without_duplicates()
+    {
+        _store.RememberBreakReason(" lunch ");
+        _store.RememberBreakReason("coffee");
+        _store.RememberBreakReason("Lunch");
+        Assert.Equal(new[] { "Lunch", "coffee" }, _store.Settings.BreakReasons);
+        Assert.Equal(new[] { "Lunch", "coffee" }, _store.ListBreakReasons());
+    }
+
+    [Fact]
+    public void Stop_and_break_reasons_share_the_same_saved_list()
+    {
+        var start = Local(10, 0);
+        _store.RememberBreakReason("coffee");
+        _clock.StartSession(_alpha, 40 * 60, start);
+        _clock.Pause(start.AddMinutes(1));
+        Assert.Equal(ClockAction.Done, _clock.TryResume(start.AddMinutes(5), "phone", thresholdSeconds: 180));
+        _store.RememberBreakReason("phone");
+
+        Assert.Equal(new[] { "phone", "coffee" }, _store.ListBreakReasons());
+        Assert.Equal(new[] { "phone", "coffee" }, _store.Settings.BreakReasons);
     }
 
     public void Dispose() => Directory.Delete(_folder, recursive: true);

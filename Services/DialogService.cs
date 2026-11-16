@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using TimeTracker.Views;
 
 namespace TimeTracker.Services;
@@ -11,25 +12,45 @@ public static class DialogService
         XamlRoot xamlRoot,
         bool endingSession,
         DateTimeOffset stoppedAt,
-        long stoppedSeconds)
+        long stoppedSeconds,
+        IReadOnlyList<string>? savedReasons = null,
+        bool startNewSession = false)
     {
-        var box = new TextBox();
+        var box = new ComboBox
+        {
+            IsEditable = true,
+            PlaceholderText = "Reason",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 320
+        };
+        foreach (var reason in savedReasons ?? [])
+            box.Items.Add(reason);
+
         var hint = new TextBlock
         {
             Text = "A reason is required.",
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+            Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
             Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
             Margin = new Thickness(0, 8, 0, 0)
         };
 
-        void UpdateHint()
+        string Chosen()
         {
-            var ready = !string.IsNullOrWhiteSpace(box.Text);
-            hint.Visibility = ready ? Visibility.Collapsed : Visibility.Visible;
+            var typed = box.Text?.Trim() ?? "";
+            if (typed.Length > 0)
+                return typed;
+            return (box.SelectedItem as string)?.Trim() ?? "";
         }
 
-        box.PlaceholderText = "Why did you stop?";
-        box.TextChanged += (_, _) => UpdateHint();
+        void UpdateHint()
+            => hint.Visibility = Chosen().Length > 0 ? Visibility.Collapsed : Visibility.Visible;
+
+        box.SelectionChanged += (_, _) => UpdateHint();
+        box.Loaded += (_, _) =>
+        {
+            if (FindDescendant<TextBox>(box) is { } inner)
+                inner.TextChanged += (_, _) => UpdateHint();
+        };
         UpdateHint();
 
         var clock = stoppedAt.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture);
@@ -64,7 +85,7 @@ public static class DialogService
         {
             Title = "Why did you stop?",
             Content = content,
-            PrimaryButtonText = endingSession ? "End session" : "Resume",
+            PrimaryButtonText = endingSession ? "End session" : startNewSession ? "Start new session" : "Resume",
             CloseButtonText = "Stay paused",
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = xamlRoot
@@ -72,12 +93,27 @@ public static class DialogService
 
         dialog.PrimaryButtonClick += (_, args) =>
         {
-            if (string.IsNullOrWhiteSpace(box.Text))
+            if (Chosen().Length == 0)
                 args.Cancel = true;
         };
 
         var result = await dialog.ShowAsync();
-        return result == ContentDialogResult.Primary ? box.Text.Trim() : null;
+        return result == ContentDialogResult.Primary ? Chosen() : null;
+    }
+
+    static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+                return match;
+            if (FindDescendant<T>(child) is { } nested)
+                return nested;
+        }
+
+        return null;
     }
 
     public static async Task<ProjectChangeChoice?> AskProjectChangeAsync(XamlRoot xamlRoot, string projectName)

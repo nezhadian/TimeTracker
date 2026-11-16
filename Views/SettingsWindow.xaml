@@ -20,7 +20,7 @@
 
           <TextBlock Text="Reason threshold (minutes)" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
           <TextBox Text="{Binding ReasonThresholdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-          <TextBlock Text="Resume asks why you stopped only when the stop is longer than this. Use 0 to ask after every stop."
+          <TextBlock Text="Resume and session end ask why you stopped only when the stop is longer than this. Changing project brings elapsed time without asking when focused time is not longer than this. Use 0 to ask after every stop."
                      Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap"/>
 
           <TextBlock Text="Daily goal (hours)" Style="{ThemeResource BodyStrongTextBlockStyle}"/>

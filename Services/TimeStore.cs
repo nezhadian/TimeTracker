@@ -254,6 +254,67 @@ public sealed class TimeStore
 
         if (settings.Projects.Count == 0 || settings.Projects.All(project => string.IsNullOrWhiteSpace(project.Name)))
             settings.Projects = TrackerSettings.CreateDefault().Projects;
+
+        settings.BreakReasons ??= [];
+        settings.BreakReasons = DistinctReasons(settings.BreakReasons);
+    }
+
+    public IReadOnlyList<string> ListBreakReasons()
+        => DistinctReasons(Settings.BreakReasons.Concat(HistoryBreakReasons()));
+
+    public void RememberBreakReason(string reason)
+    {
+        reason = reason.Trim();
+        if (reason.Length == 0)
+            return;
+
+        Settings.BreakReasons ??= [];
+        Settings.BreakReasons.RemoveAll(item => string.Equals(item, reason, StringComparison.OrdinalIgnoreCase));
+        Settings.BreakReasons.Insert(0, reason);
+        if (Settings.BreakReasons.Count > 80)
+            Settings.BreakReasons.RemoveRange(80, Settings.BreakReasons.Count - 80);
+        SaveSettings(Settings);
+    }
+
+    public void ImportBreakReasonsFromHistory()
+    {
+        var merged = ListBreakReasons();
+        if (merged.Count == 0)
+            return;
+        if (Settings.BreakReasons.Count == merged.Count
+            && Settings.BreakReasons.Zip(merged, (left, right) => string.Equals(left, right, StringComparison.Ordinal)).All(same => same))
+            return;
+        Settings.BreakReasons = merged.ToList();
+        SaveSettings(Settings);
+    }
+
+    IEnumerable<string> HistoryBreakReasons()
+    {
+        foreach (var date in ListDays().OrderByDescending(day => day))
+        {
+            var day = LoadDay(date);
+            foreach (var entry in day.Breaks)
+                yield return entry.Reason;
+            foreach (var stop in day.Stops)
+                yield return stop.Reason;
+        }
+    }
+
+    static List<string> DistinctReasons(IEnumerable<string> reasons)
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var reason in reasons)
+        {
+            var text = reason?.Trim() ?? "";
+            if (text.Length == 0 || !seen.Add(text))
+                continue;
+            result.Add(text);
+            if (result.Count >= 80)
+                break;
+        }
+
+        return result;
     }
 
     T? ReadJson<T>(string path)

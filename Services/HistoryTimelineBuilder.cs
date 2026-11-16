@@ -41,7 +41,7 @@ public static class HistoryTimelineBuilder
             SummaryText = $"{TimeMath.FormatShort(work)} worked · {TimeMath.FormatShort(stopped)} stopped",
             Events = events,
             Projects = projects,
-            BarSegments = BuildBar(events)
+            BarSegments = BuildBar(events, date, now)
         };
     }
 
@@ -161,37 +161,57 @@ public static class HistoryTimelineBuilder
             .ToList();
     }
 
-    static List<HistoryBarSegment> BuildBar(IReadOnlyList<HistoryEvent> events)
+    static List<HistoryBarSegment> BuildBar(IReadOnlyList<HistoryEvent> events, DateOnly date, DateTimeOffset now)
     {
+        var dayStart = TimeMath.LocalDayStart(date);
+        var dayEnd = TimeMath.NextLocalMidnight(dayStart);
         var segments = new List<HistoryBarSegment>();
-        HistoryEvent? previous = null;
+        var cursor = dayStart;
         foreach (var item in events)
         {
-            if (previous is not null)
-            {
-                var previousEnd = previous.End ?? item.Start;
-                var gap = TimeMath.SecondsBetween(previousEnd, item.Start);
-                if (gap > 0)
-                {
-                    segments.Add(new HistoryBarSegment
-                    {
-                        Seconds = gap,
-                        IsGap = true,
-                        ToolTip = "Untracked " + TimeMath.FormatShort(gap)
-                    });
-                }
-            }
+            var start = item.Start < dayStart ? dayStart : item.Start;
+            var end = item.End ?? now;
+            if (end > dayEnd)
+                end = dayEnd;
+            if (end <= dayStart || start >= dayEnd)
+                continue;
+
+            var lead = TimeMath.SecondsBetween(cursor, start);
+            if (lead > 0)
+                segments.Add(Gap(lead, cursor, now));
+
+            var duration = TimeMath.SecondsBetween(start, end);
+            if (duration <= 0 && !item.Open)
+                continue;
 
             segments.Add(new HistoryBarSegment
             {
-                Seconds = Math.Max(item.Seconds, 1),
+                Seconds = Math.Max(duration, 1),
                 Color = item.Color,
                 ToolTip = item.ToolTip
             });
-            previous = item;
+            cursor = end > cursor ? end : cursor;
         }
 
+        var tail = TimeMath.SecondsBetween(cursor, dayEnd);
+        if (tail > 0)
+            segments.Add(Gap(tail, cursor, now));
+
+        if (segments.Count == 0)
+            segments.Add(Gap(TimeMath.SecondsBetween(dayStart, dayEnd), dayStart, now));
+
         return segments;
+    }
+
+    static HistoryBarSegment Gap(long seconds, DateTimeOffset from, DateTimeOffset now)
+    {
+        var remaining = from >= now;
+        return new HistoryBarSegment
+        {
+            Seconds = seconds,
+            IsGap = true,
+            ToolTip = (remaining ? "Remaining " : "Untracked ") + TimeMath.FormatShort(seconds)
+        };
     }
 
     static HistoryEvent Create(

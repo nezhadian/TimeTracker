@@ -35,7 +35,7 @@ public class HistoryTimelineBuilderTests
             ]
         };
 
-        var view = HistoryTimelineBuilder.Build(day, start.AddHours(2));
+        var view = HistoryTimelineBuilder.Build(day, start.AddDays(1));
 
         Assert.Equal(4, view.Events.Count);
         Assert.Equal(new[] { HistoryEventKind.Work, HistoryEventKind.Pause, HistoryEventKind.Work, HistoryEventKind.Break },
@@ -50,7 +50,29 @@ public class HistoryTimelineBuilderTests
         Assert.Equal("Alpha", view.Projects[0].Name);
         Assert.Equal(40 * 60, view.Projects[0].Seconds);
         Assert.Contains(view.BarSegments, item => item.IsGap);
-        Assert.Equal(1, view.BarSegments.Count(item => item.IsGap));
+        Assert.Equal(24 * 3600d, view.BarSegments.Sum(item => item.Seconds), 1);
+    }
+
+    [Fact]
+    public void Today_timeline_bar_spans_twenty_four_hours()
+    {
+        var date = DateOnly.FromDateTime(DateTime.Today);
+        var start = TimeMath.LocalDayStart(date).AddHours(9);
+        var now = start.AddHours(1);
+        var day = new DayFile
+        {
+            Date = date.ToString("yyyy-MM-dd"),
+            Slices =
+            [
+                Slice("alpha", "Alpha", "#3B82F6", start, start.AddMinutes(30))
+            ]
+        };
+
+        var view = HistoryTimelineBuilder.Build(day, now);
+        Assert.Equal(24 * 3600d, view.BarSegments.Sum(item => item.Seconds), 1);
+        Assert.True(view.BarSegments[0].IsGap);
+        Assert.True(view.BarSegments[^1].IsGap);
+        Assert.Contains(view.BarSegments, item => item.Color == "#3B82F6" && !item.IsGap);
     }
 
     [Fact]

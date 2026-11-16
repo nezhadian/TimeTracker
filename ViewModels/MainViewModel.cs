@@ -15,6 +15,8 @@ public partial class MainViewModel : ObservableObject
     readonly AlarmPlayer _alarm;
     int _suppress;
     bool _alarmRunning;
+    bool _completionPromptShown;
+    bool _promptingReason;
 
     public MainViewModel(TimeStore store, SessionClock clock, AlarmPlayer alarm)
     {
@@ -28,13 +30,21 @@ public partial class MainViewModel : ObservableObject
 
     public ObservableCollection<Project> Projects { get; } = [];
 
+    public ObservableCollection<string> SavedBreakReasons { get; } = [];
+
+    public ObservableCollection<OverviewProjectItem> OverviewProjects { get; } = [];
+
     public ObservableCollection<HistoryDayItem> HistoryDays { get; } = [];
 
     public ObservableCollection<HistoryEvent> HistoryEvents { get; } = [];
 
     public ObservableCollection<HistoryProjectTotal> HistoryProjects { get; } = [];
 
+    public ObservableCollection<OverviewProjectItem> HistoryOverviewProjects { get; } = [];
+
     public IReadOnlyList<RingSegment> RingSegments { get; private set; } = [];
+
+    public IReadOnlyList<RingSegment> HistoryOverviewSegments { get; private set; } = [];
 
     public IReadOnlyList<HistoryBarSegment> HistoryBarItems { get; private set; } = [];
 
@@ -68,6 +78,9 @@ public partial class MainViewModel : ObservableObject
     private bool _canToggleSession = true;
 
     [ObservableProperty]
+    private bool _showResetButton;
+
+    [ObservableProperty]
     private string _yesterdayText = "0m";
 
     [ObservableProperty]
@@ -78,6 +91,9 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _goalHoursNumber = "12";
+
+    [ObservableProperty]
+    private string _historyGoalHoursNumber = "12";
 
     [ObservableProperty]
     private string _completedText = "Completed: 0 hours, 0 minutes";
@@ -127,11 +143,16 @@ public partial class MainViewModel : ObservableObject
 
     public bool ShowEmptyDayLog => SelectedHistoryDay is not null && !HasHistoryEvents;
 
+    public bool HasSelectedHistoryDay => SelectedHistoryDay is not null;
+
     public void Start()
     {
         _clock.Restore(DateTimeOffset.Now);
+        _store.ImportBreakReasonsFromHistory();
         ReloadProjects();
+        ReloadBreakReasons();
         Refresh();
+        _ = PromptIfSessionCompletedAsync();
     }
 
     public void Tick()
@@ -153,6 +174,7 @@ public partial class MainViewModel : ObservableObject
         StartAlarmIfDue();
         Refresh();
         RefreshHistoryLive(now);
+        _ = PromptIfSessionCompletedAsync();
     }
 
     public void Flush()
@@ -185,6 +207,8 @@ public partial class MainViewModel : ObservableObject
         {
             if (!await ResumeAsync(now))
                 return;
+            if (_clock.State.Session is null)
+                _clock.StartSession(project, _store.Settings.SessionLengthMinutes * 60, DateTimeOffset.Now);
         }
         else if (_clock.IsBreakActive)
         {
@@ -201,6 +225,9 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     async Task EndSession()
     {
+        if (_promptingReason)
+            return;
+
         var now = DateTimeOffset.Now;
         var threshold = ThresholdSeconds;
         var action = _clock.EndSession(now, null, threshold);
@@ -230,6 +257,7 @@ public partial class MainViewModel : ObservableObject
         {
             _clock.Restore(DateTimeOffset.Now);
             ReloadProjects();
+            ReloadBreakReasons();
             Refresh();
             if (ShowHistory)
                 LoadHistory();
@@ -255,6 +283,8 @@ public partial class MainViewModel : ObservableObject
 
         ErrorText = "";
         _clock.StartBreak(minutes * 60, BreakReason, now);
+        _store.RememberBreakReason(BreakReason);
+        ReloadBreakReasons();
         Refresh();
     }
 
@@ -272,6 +302,25 @@ public partial class MainViewModel : ObservableObject
         if (session is null || session.ProjectId == value.Id)
             return;
 
+        if (_promptingReason)
+        {
+            RevertProject(session.ProjectId);
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        _clock.CatchUp(now);
+        session = _clock.State.Session;
+        if (session is null || session.ProjectId == value.Id)
+            return;
+
+        if (_clock.SessionElapsedSeconds(now) <= ThresholdSeconds)
+        {
+            _clock.MoveSessionToProject(value, now);
+            Refresh();
+            return;
+        }
+
         var choice = await AskProjectChangeAsync(value.Name);
         if (choice is null)
         {
@@ -279,7 +328,7 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        var now = DateTimeOffset.Now;
+        now = DateTimeOffset.Now;
         if (choice == ProjectChangeChoice.MoveElapsed)
             _clock.MoveSessionToProject(value, now);
         else
@@ -297,6 +346,7 @@ public partial class MainViewModel : ObservableObject
     partial void OnSelectedHistoryDayChanged(HistoryDayItem? value)
     {
         OnPropertyChanged(nameof(ShowEmptyDayLog));
+        OnPropertyChanged(nameof(HasSelectedHistoryDay));
         if (_suppress > 0)
             return;
         LoadTimeline();
@@ -336,6 +386,9 @@ public partial class MainViewModel : ObservableObject
 
     async Task<bool> ResumeAsync(DateTimeOffset now)
     {
+        if (_promptingReason)
+            return false;
+
         var threshold = ThresholdSeconds;
         var action = _clock.TryResume(now, null, threshold);
         if (action != ClockAction.NeedReason)
@@ -347,14 +400,60 @@ public partial class MainViewModel : ObservableObject
         return _clock.TryResume(DateTimeOffset.Now, reason, threshold) == ClockAction.Done;
     }
 
-    async Task<string?> AskReasonAsync(bool endingSession)
+    async Task PromptIfSessionCompletedAsync()
     {
-        if (DialogXamlRoot is null)
+        if (!_clock.IsSessionComplete)
+        {
+            _completionPromptShown = false;
+            return;
+        }
+
+        if (_promptingReason || _completionPromptShown || DialogXamlRoot is null)
+            return;
+        if (!_clock.PauseNeedsReason(DateTimeOffset.Now, ThresholdSeconds))
+            return;
+
+        _completionPromptShown = true;
+        var reason = await AskReasonAsync(endingSession: false);
+        if (reason is null)
+            return;
+        if (_clock.TryResume(DateTimeOffset.Now, reason, ThresholdSeconds) != ClockAction.Done)
+            return;
+        if (_clock.State.Session is null && SelectedProject is not null)
+            _clock.StartSession(SelectedProject, _store.Settings.SessionLengthMinutes * 60, DateTimeOffset.Now);
+        Refresh();
+    }
+
+    async Task<string?> AskReasonAsync(bool endingSession, bool startNewSession = false)
+    {
+        if (DialogXamlRoot is null || _promptingReason)
             return null;
-        var now = DateTimeOffset.Now;
-        var stoppedAt = _clock.State.Session?.PauseStart ?? now;
-        var stoppedSeconds = TimeMath.SecondsBetween(stoppedAt, now);
-        return await DialogService.AskReasonAsync(DialogXamlRoot, endingSession, stoppedAt, stoppedSeconds);
+
+        _promptingReason = true;
+        try
+        {
+            var now = DateTimeOffset.Now;
+            var stoppedAt = _clock.State.Session?.PauseStart ?? now;
+            var stoppedSeconds = TimeMath.SecondsBetween(stoppedAt, now);
+            var reason = await DialogService.AskReasonAsync(
+                DialogXamlRoot,
+                endingSession,
+                stoppedAt,
+                stoppedSeconds,
+                _store.ListBreakReasons(),
+                startNewSession: startNewSession || (!endingSession && _clock.IsSessionComplete));
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                _store.RememberBreakReason(reason);
+                ReloadBreakReasons();
+            }
+
+            return reason;
+        }
+        finally
+        {
+            _promptingReason = false;
+        }
     }
 
     void ReloadProjects()
@@ -379,6 +478,7 @@ public partial class MainViewModel : ObservableObject
 
             SelectedProject = Projects.FirstOrDefault(project => project.Id == selectedId) ?? Projects.FirstOrDefault();
             ShowDailyOverview = _store.Settings.ShowDailyOverview;
+            SyncOverviewProjects();
         }
         finally
         {
@@ -402,6 +502,7 @@ public partial class MainViewModel : ObservableObject
             PrimaryGlyph = "\uE768";
             PrimaryToolTip = "Start";
             CanToggleSession = !_clock.IsBreakActive && SelectedProject is not null;
+            ShowResetButton = false;
         }
         else
         {
@@ -409,10 +510,15 @@ public partial class MainViewModel : ObservableObject
             RemainingText = TimeMath.FormatCountdown(TimeMath.CeilSeconds(remaining));
             var elapsed = _clock.SessionElapsedSeconds(now);
             ElapsedFraction = session.PlannedSeconds <= 0 ? 0 : Math.Clamp(elapsed / (double)session.PlannedSeconds, 0, 1);
-            SessionStatus = _clock.IsBreakActive ? "On break" : _clock.IsPaused ? "Paused" : "";
+            SessionStatus = _clock.IsBreakActive
+                ? "On break"
+                : _clock.IsSessionComplete
+                    ? "Session complete"
+                    : _clock.IsPaused ? "Paused" : "";
             PrimaryGlyph = _clock.IsRunning ? "\uE769" : "\uE768";
-            PrimaryToolTip = _clock.IsRunning ? "Pause" : "Resume";
+            PrimaryToolTip = _clock.IsRunning ? "Pause" : _clock.IsSessionComplete ? "Start new session" : "Resume";
             CanToggleSession = !_clock.IsBreakActive;
+            ShowResetButton = _clock.IsPaused && !_clock.IsBreakActive;
         }
 
         StoppedTodayText = "Stopped today: " + TimeMath.FormatShort(stopped);
@@ -442,8 +548,14 @@ public partial class MainViewModel : ObservableObject
         _ = now;
         var settings = _store.Settings;
         ShowRingLabels = ShowDailyOverview;
+        var includedIds = OverviewProjects.Where(item => item.IncludeInRing).Select(item => item.Id).ToHashSet();
+        var included = OverviewProjects.Count == 0
+            ? settings.Projects.ToList()
+            : settings.Projects.Where(project => includedIds.Contains(project.Id)).ToList();
+        var chartIds = included.Select(project => project.Id).ToHashSet();
+        var overviewSlices = slices.Where(slice => chartIds.Contains(slice.ProjectId)).ToList();
         RingSegments = ShowDailyOverview || SelectedProject is null
-            ? DailyRingBuilder.BuildOverview(settings.Projects, slices, settings.DailyGoalHours)
+            ? DailyRingBuilder.BuildOverview(included, overviewSlices, settings.DailyGoalHours)
             : DailyRingBuilder.BuildSelected(SelectedProject, slices.Where(slice => slice.ProjectId == SelectedProject.Id).Sum(slice => slice.Seconds), settings.DailyGoalHours);
 
         var completed = ShowDailyOverview || SelectedProject is null
@@ -613,6 +725,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         HistorySummaryText = HistoryTimelineBuilder.Build(day, now).SummaryText;
+        BindHistoryRings(day);
     }
 
     void LoadTimeline()
@@ -620,7 +733,9 @@ public partial class MainViewModel : ObservableObject
         HistoryEvents.Clear();
         HistoryProjects.Clear();
         HistoryBarItems = [];
+        HistoryOverviewSegments = [];
         _historyStamp = "";
+        OnPropertyChanged(nameof(HasSelectedHistoryDay));
 
         if (SelectedHistoryDay is null)
         {
@@ -629,7 +744,10 @@ public partial class MainViewModel : ObservableObject
                 ? "Select a day to see its log."
                 : "No days logged yet.";
             HasHistoryEvents = false;
+            HistoryOverviewProjects.Clear();
+            HistoryGoalHoursNumber = TimeMath.FormatGoalNumber(_store.Settings.DailyGoalHours);
             OnPropertyChanged(nameof(HistoryBarItems));
+            OnPropertyChanged(nameof(HistoryOverviewSegments));
             return;
         }
 
@@ -645,6 +763,8 @@ public partial class MainViewModel : ObservableObject
         HistoryBarItems = view.BarSegments;
         HasHistoryEvents = HistoryEvents.Count > 0;
         _historyStamp = HistoryTimelineBuilder.Stamp(day);
+        SyncHistoryOverviewProjects(ProjectsForDay(day));
+        BindHistoryRings(day);
         OnPropertyChanged(nameof(HistoryBarItems));
     }
 
@@ -663,7 +783,122 @@ public partial class MainViewModel : ObservableObject
         item.Badge = HistoryTimelineBuilder.FormatBadge(item.Date, today);
     }
 
+    void ReloadBreakReasons()
+    {
+        SavedBreakReasons.Clear();
+        foreach (var reason in _store.ListBreakReasons())
+            SavedBreakReasons.Add(reason);
+    }
+
+    void SyncOverviewProjects()
+    {
+        var visible = OverviewProjects.ToDictionary(item => item.Id, item => item.IncludeInRing);
+        OverviewProjects.Clear();
+        foreach (var project in _store.Settings.Projects)
+            OverviewProjects.Add(new OverviewProjectItem(project, visible.GetValueOrDefault(project.Id, true), ApplyOverviewProjectFilter));
+    }
+
+    void ApplyOverviewProjectFilter()
+    {
+        if (_suppress > 0)
+            return;
+        UpdateRing(DateTimeOffset.Now, TodaySlices(DateTimeOffset.Now));
+    }
+
+    void SyncHistoryOverviewProjects(IReadOnlyList<Project> projects)
+    {
+        var visible = HistoryOverviewProjects.ToDictionary(item => item.Id, item => item.IncludeInRing);
+        HistoryOverviewProjects.Clear();
+        foreach (var project in projects)
+            HistoryOverviewProjects.Add(new OverviewProjectItem(project, visible.GetValueOrDefault(project.Id, true), ApplyHistoryOverviewFilter));
+    }
+
+    void ApplyHistoryOverviewFilter()
+    {
+        if (_suppress > 0 || SelectedHistoryDay is null)
+            return;
+        BindHistoryRings(_store.LoadDay(SelectedHistoryDay.Date));
+    }
+
+    void BindHistoryRings(DayFile day)
+    {
+        var projects = ProjectsForDay(day);
+        var dailyGoal = day.Totals.DailyGoalHours > 0 ? day.Totals.DailyGoalHours : _store.Settings.DailyGoalHours;
+        var includedIds = HistoryOverviewProjects.Where(item => item.IncludeInRing).Select(item => item.Id).ToHashSet();
+        var included = HistoryOverviewProjects.Count == 0
+            ? projects
+            : projects.Where(project => includedIds.Contains(project.Id)).ToList();
+        var chartIds = included.Select(project => project.Id).ToHashSet();
+        var slices = day.Slices.Where(slice => chartIds.Contains(slice.ProjectId)).ToList();
+        HistoryOverviewSegments = DailyRingBuilder.BuildOverview(included, slices, dailyGoal);
+        HistoryGoalHoursNumber = TimeMath.FormatGoalNumber(dailyGoal);
+        OnPropertyChanged(nameof(HistoryOverviewSegments));
+    }
+
+    List<Project> ProjectsForDay(DayFile day)
+    {
+        var projects = new List<Project>();
+        var seen = new HashSet<string>();
+        foreach (var snap in day.Totals.ProjectGoals)
+        {
+            if (string.IsNullOrWhiteSpace(snap.ProjectId) || !seen.Add(snap.ProjectId))
+                continue;
+            projects.Add(new Project
+            {
+                Id = snap.ProjectId,
+                Name = string.IsNullOrWhiteSpace(snap.Name) ? "Project" : snap.Name,
+                Color = string.IsNullOrWhiteSpace(snap.Color) ? "#2EE59D" : snap.Color,
+                DailyGoalHours = snap.GoalHours
+            });
+        }
+
+        foreach (var project in _store.Settings.Projects)
+        {
+            if (!seen.Add(project.Id))
+                continue;
+            projects.Add(project);
+        }
+
+        foreach (var group in day.Slices.GroupBy(slice => slice.ProjectId))
+        {
+            if (string.IsNullOrWhiteSpace(group.Key) || !seen.Add(group.Key))
+                continue;
+            var sample = group.Last();
+            projects.Add(new Project
+            {
+                Id = sample.ProjectId,
+                Name = string.IsNullOrWhiteSpace(sample.Name) ? "Project" : sample.Name,
+                Color = string.IsNullOrWhiteSpace(sample.Color) ? "#2EE59D" : sample.Color
+            });
+        }
+
+        return projects;
+    }
+
     bool IsLive => _clock.State.Session is not null || _clock.State.Break is not null;
 
     int ThresholdSeconds => _store.Settings.ReasonThresholdMinutes * 60;
+}
+
+public partial class OverviewProjectItem : ObservableObject
+{
+    readonly Action _changed;
+
+    public OverviewProjectItem(Project project, bool includeInRing, Action changed)
+    {
+        Id = project.Id;
+        Name = project.Name;
+        Color = project.Color;
+        _changed = changed;
+        _includeInRing = includeInRing;
+    }
+
+    public string Id { get; }
+    public string Name { get; }
+    public string Color { get; }
+
+    [ObservableProperty]
+    private bool _includeInRing;
+
+    partial void OnIncludeInRingChanged(bool value) => _changed();
 }

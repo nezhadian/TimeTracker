@@ -60,6 +60,24 @@ public class RingAndStreakTests
     }
 
     [Fact]
+    public void Overview_uses_only_the_projects_passed_in()
+    {
+        var alpha = new Project { Id = "a", Name = "Alpha", Color = "#3B82F6", DailyGoalHours = 4 };
+        var beta = new Project { Id = "b", Name = "Beta", Color = "#F59E0B", DailyGoalHours = 3 };
+        var slices = new List<WorkSlice>
+        {
+            Slice("a", 3600),
+            Slice("b", 3600)
+        };
+
+        var segments = DailyRingBuilder.BuildOverview([beta], slices.Where(slice => slice.ProjectId == "b").ToList(), 12);
+
+        Assert.DoesNotContain(segments, segment => segment.Label == "Alpha");
+        Assert.Contains(segments, segment => segment.Label == "Beta");
+        Assert.Equal(12 * 3600d, segments.Sum(segment => segment.Seconds), 0.1);
+    }
+
+    [Fact]
     public void Selected_ring_uses_the_project_goal_when_it_has_one()
     {
         var project = new Project { Id = "a", Name = "Alpha", Color = "#3B82F6", DailyGoalHours = 2 };

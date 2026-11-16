@@ -22,6 +22,9 @@ public sealed class SessionClock
 
     public bool IsBreakActive => State.Break is { End: null };
 
+    public bool IsSessionComplete =>
+        State.Session is { } session && session.CompletedSeconds >= session.PlannedSeconds;
+
     public void Restore(DateTimeOffset now)
     {
         State = _store.LoadState();
@@ -62,7 +65,10 @@ public sealed class SessionClock
 
         CatchUp(now);
         if (State.Session?.SliceStart is null)
+        {
+            Persist(now);
             return ClockAction.Done;
+        }
 
         CloseOpenSlice(now);
         State.Session.PauseStart = now;
@@ -88,6 +94,13 @@ public sealed class SessionClock
         }
 
         CloseOpenPause(now);
+        if (session.CompletedSeconds >= session.PlannedSeconds)
+        {
+            State.Session = null;
+            Persist(now);
+            return ClockAction.Done;
+        }
+
         session.SliceStart = now;
         session.PauseKind = null;
         session.PauseReason = null;
@@ -266,6 +279,9 @@ public sealed class SessionClock
         return remaining > 0 ? remaining : 0;
     }
 
+    public bool PauseNeedsReason(DateTimeOffset now, int thresholdSeconds)
+        => State.Session is { } session && NeedsReason(session, now, thresholdSeconds);
+
     public WorkSlice? CurrentOpenSlice(DateTimeOffset now)
     {
         if (State.Session?.SliceStart is not DateTimeOffset start)
@@ -331,7 +347,7 @@ public sealed class SessionClock
             if (remaining > 0)
                 session.SliceStart = end;
             else
-                State.Session = null;
+                BeginPostSessionStop(end);
         }
 
         ReplaceBreak(ToBreak(live, open: false));
@@ -348,7 +364,7 @@ public sealed class SessionClock
             var remaining = session.PlannedSeconds - session.CompletedSeconds;
             if (remaining <= 0)
             {
-                State.Session = null;
+                BeginPostSessionStop(session.SliceStart ?? now);
                 return;
             }
 
@@ -366,12 +382,28 @@ public sealed class SessionClock
             CloseSlice(start, end);
             if (end >= hardEnd)
             {
-                State.Session = null;
+                BeginPostSessionStop(end);
                 return;
             }
 
             session.SliceStart = end;
         }
+    }
+
+    void BeginPostSessionStop(DateTimeOffset at)
+    {
+        var session = State.Session;
+        if (session is null)
+            return;
+
+        session.SliceStart = null;
+        if (session.PauseStart is not null)
+            return;
+
+        session.PauseStart = at;
+        session.PauseKind = "pause";
+        session.PauseReason = "";
+        session.ReasonCaptured = false;
     }
 
     void CloseOpenSlice(DateTimeOffset now)

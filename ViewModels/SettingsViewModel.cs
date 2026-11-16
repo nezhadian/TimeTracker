@@ -185,6 +185,7 @@ public partial class SettingsViewModel : ObservableObject
             ReasonThresholdMinutes = threshold,
             DailyGoalHours = dailyGoal,
             ShowDailyOverview = _store.Settings.ShowDailyOverview,
+            BreakReasons = _store.Settings.BreakReasons,
             Projects = savedProjects
         };
 

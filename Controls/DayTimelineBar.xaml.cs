@@ -18,6 +18,7 @@ public sealed partial class DayTimelineBar : UserControl
     public DayTimelineBar()
     {
         InitializeComponent();
+        SizeChanged += (_, _) => Redraw();
     }
 
     public IEnumerable<HistoryBarSegment>? Segments
@@ -30,6 +31,10 @@ public sealed partial class DayTimelineBar : UserControl
     {
         Surface.Children.Clear();
         Surface.ColumnDefinitions.Clear();
+        Hours.Children.Clear();
+        Hours.ColumnDefinitions.Clear();
+        DrawHours();
+
         var items = Segments?.ToList() ?? [];
         if (items.Count == 0)
             return;
@@ -48,13 +53,29 @@ public sealed partial class DayTimelineBar : UserControl
             var block = new Border
             {
                 Background = fill,
-                CornerRadius = new CornerRadius(3),
-                Margin = new Thickness(i == 0 ? 0 : 2, 0, 0, 0)
+                CornerRadius = new CornerRadius(2)
             };
             if (!string.IsNullOrWhiteSpace(item.ToolTip))
                 ToolTipService.SetToolTip(block, item.ToolTip);
             Grid.SetColumn(block, i);
             Surface.Children.Add(block);
+        }
+    }
+
+    void DrawHours()
+    {
+        for (var hour = 1; hour <= 24; hour++)
+        {
+            Hours.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var label = new TextBlock
+            {
+                Text = hour.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                FontSize = 10,
+                Opacity = 0.55,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            Grid.SetColumn(label, hour - 1);
+            Hours.Children.Add(label);
         }
     }
 }
