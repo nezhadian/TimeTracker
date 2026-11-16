@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Windows.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Markup;
@@ -17,9 +19,18 @@ public static class DialogService
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto"/>
               <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Ellipse Width="12" Height="12" Fill="{Binding Swatch}" Visibility="{Binding SwatchVisibility}" VerticalAlignment="Center"/>
             <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center"/>
+            <Button Grid.Column="2" Command="{Binding DeleteCommand}"
+                    Visibility="{Binding DeleteVisibility}"
+                    Background="Transparent" BorderThickness="0" Padding="6,4"
+                    MinWidth="32" MinHeight="32" AllowFocusOnInteraction="True"
+                    ToolTipService.ToolTip="Remove from list"
+                    AutomationProperties.Name="Remove from list">
+              <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" FontSize="12"/>
+            </Button>
           </Grid>
         </DataTemplate>
         """;
@@ -31,23 +42,36 @@ public static class DialogService
         long stoppedSeconds,
         IReadOnlyList<string>? savedReasons = null,
         IReadOnlyList<Project>? projects = null,
-        bool startNewSession = false)
+        bool startNewSession = false,
+        Action<string>? forgetReason = null)
     {
-        var items = new List<ReasonListItem>();
-        foreach (var project in projects ?? [])
-            items.Add(ReasonListItem.FromProject(project));
-        foreach (var reason in savedReasons ?? [])
-            items.Add(ReasonListItem.FromText(reason));
-
+        var items = new ObservableCollection<ReasonListItem>();
         var box = new ComboBox
         {
             IsEditable = true,
             PlaceholderText = "Reason",
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             MinWidth = 320,
             ItemTemplate = (DataTemplate)XamlReader.Load(ReasonItemTemplateXaml),
             ItemsSource = items
         };
+        box.ItemContainerStyle = ComboItemStretchStyle();
+
+        foreach (var project in projects ?? [])
+            items.Add(ReasonListItem.FromProject(project));
+        foreach (var reason in savedReasons ?? [])
+        {
+            ReasonListItem? item = null;
+            item = ReasonListItem.FromText(reason, forgetReason is null ? null : () =>
+            {
+                forgetReason(reason);
+                items.Remove(item!);
+                if (ReferenceEquals(box.SelectedItem, item))
+                    box.SelectedItem = null;
+            });
+            items.Add(item);
+        }
 
         var hint = new TextBlock
         {
@@ -131,6 +155,8 @@ public static class DialogService
         public Project? Project { get; init; }
         public Brush Swatch { get; init; } = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         public Visibility SwatchVisibility { get; init; } = Visibility.Collapsed;
+        public ICommand? DeleteCommand { get; init; }
+        public Visibility DeleteVisibility { get; init; } = Visibility.Collapsed;
 
         public override string ToString() => Label;
 
@@ -143,8 +169,30 @@ public static class DialogService
                 SwatchVisibility = Visibility.Visible
             };
 
-        public static ReasonListItem FromText(string reason)
-            => new() { Label = reason };
+        public static ReasonListItem FromText(string reason, Action? onDelete = null)
+            => new()
+            {
+                Label = reason,
+                DeleteCommand = onDelete is null ? null : new ActionCommand(onDelete),
+                DeleteVisibility = onDelete is null ? Visibility.Collapsed : Visibility.Visible
+            };
+    }
+
+    sealed class ActionCommand(Action execute) : ICommand
+    {
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) => execute();
+        public event EventHandler? CanExecuteChanged { add { } remove { } }
+    }
+
+    static Style ComboItemStretchStyle()
+    {
+        var style = new Style(typeof(ComboBoxItem))
+        {
+            BasedOn = Application.Current.Resources["DefaultComboBoxItemStyle"] as Style
+        };
+        style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        return style;
     }
 
     static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject

@@ -229,13 +229,46 @@
                   <TextBox Width="72" Text="{Binding BreakMinutesText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                            IsEnabled="{Binding BreakFieldsEnabled}" ToolTipService.ToolTip="Break length in minutes"/>
                   <TextBlock Text="min" VerticalAlignment="Center" Style="{ThemeResource CaptionTextBlockStyle}"/>
-                  <ComboBox MinWidth="180"
+                  <ComboBox MinWidth="220"
                             IsEditable="True"
+                            HorizontalContentAlignment="Stretch"
                             ItemsSource="{Binding SavedBreakReasons}"
                             Text="{Binding BreakReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                             IsEnabled="{Binding BreakFieldsEnabled}"
                             PlaceholderText="Reason"
-                            ToolTipService.ToolTip="Reason"/>
+                            ToolTipService.ToolTip="Reason">
+                    <ComboBox.ItemContainerStyle>
+                      <Style TargetType="ComboBoxItem" BasedOn="{StaticResource DefaultComboBoxItemStyle}">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                      </Style>
+                    </ComboBox.ItemContainerStyle>
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <Grid ColumnSpacing="8">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                          </Grid.ColumnDefinitions>
+                          <Border Padding="8,2" CornerRadius="8" VerticalAlignment="Center"
+                                  Background="{Binding BadgeColor, Converter={StaticResource HexBrush}}"
+                                  Visibility="{Binding ShowBreakBadge, Converter={StaticResource BoolVis}}">
+                            <TextBlock Text="Break" FontSize="11"
+                                       Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                          </Border>
+                          <TextBlock Grid.Column="1" Text="{Binding Text}" VerticalAlignment="Center"/>
+                          <Button Grid.Column="2" Click="RemoveBreakReason_Click" Tag="{Binding Text}"
+                                  Visibility="{Binding CanDelete, Converter={StaticResource BoolVis}}"
+                                  Background="Transparent" BorderThickness="0" Padding="6,4"
+                                  MinWidth="32" MinHeight="32" AllowFocusOnInteraction="True"
+                                  ToolTipService.ToolTip="Remove from list"
+                                  AutomationProperties.Name="Remove from list">
+                            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" FontSize="12"/>
+                          </Button>
+                        </Grid>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
                   <Button Content="{Binding BreakButtonText}"
                           Command="{Binding StartOrCancelBreakCommand}" MinWidth="120"/>
                 </StackPanel>

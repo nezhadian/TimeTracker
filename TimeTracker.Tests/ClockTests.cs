@@ -416,6 +416,41 @@ public class ClockTests : IDisposable
     }
 
     [Fact]
+    public void Forgetting_a_reason_drops_it_from_the_dropdown_and_leaves_the_log()
+    {
+        var start = Local(10, 0);
+        _clock.StartSession(_alpha, 40 * 60, start);
+        _clock.Pause(start.AddMinutes(1));
+        Assert.Equal(ClockAction.Done, _clock.TryResume(start.AddMinutes(5), "phone", thresholdSeconds: 180));
+        _store.RememberBreakReason("phone");
+        _store.RememberBreakReason("coffee");
+
+        _store.ForgetBreakReason("Phone");
+        _store.ImportBreakReasonsFromHistory();
+
+        Assert.Equal(new[] { "coffee" }, _store.ListBreakReasons());
+        Assert.DoesNotContain("phone", _store.Settings.BreakReasons, StringComparer.OrdinalIgnoreCase);
+        var stop = Assert.Single(_store.LoadDay(DateOnly.FromDateTime(start.LocalDateTime)).Stops, item => !item.Open);
+        Assert.Equal("phone", stop.Reason);
+
+        _store.RememberBreakReason("phone");
+        Assert.Equal(new[] { "phone", "coffee" }, _store.ListBreakReasons());
+    }
+
+    [Fact]
+    public void Long_and_short_break_reasons_stay_out_of_the_shared_reason_list()
+    {
+        _store.RememberBreakReason("Long Break");
+        _store.RememberBreakReason("Short Break");
+        _store.RememberBreakReason("coffee");
+        _store.Settings.BreakReasons.Insert(0, "Long Break");
+        _store.ForgetBreakReason("Long Break");
+
+        Assert.Equal(new[] { "coffee" }, _store.ListBreakReasons());
+        Assert.DoesNotContain("Long Break", _store.Settings.HiddenBreakReasons, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Choosing_a_project_as_the_stop_reason_counts_the_pause_as_work()
     {
         var start = Local(10, 0);

@@ -257,24 +257,52 @@ public sealed class TimeStore
         if (settings.Projects.Count == 0 || settings.Projects.All(project => string.IsNullOrWhiteSpace(project.Name)))
             settings.Projects = TrackerSettings.CreateDefault().Projects;
 
+        settings.HiddenBreakReasons ??= [];
+        settings.HiddenBreakReasons = DistinctReasons(settings.HiddenBreakReasons, 200);
+        settings.HiddenBreakReasons.RemoveAll(IsPresetBreakReason);
         settings.BreakReasons ??= [];
         settings.BreakReasons = DistinctReasons(settings.BreakReasons);
+        settings.BreakReasons.RemoveAll(item => IsPresetBreakReason(item) || IsHiddenReason(settings, item));
     }
 
+    public const string LongBreakReason = "Long Break";
+    public const string ShortBreakReason = "Short Break";
+
+    public static bool IsPresetBreakReason(string? reason)
+        => string.Equals(reason?.Trim(), LongBreakReason, StringComparison.OrdinalIgnoreCase)
+           || string.Equals(reason?.Trim(), ShortBreakReason, StringComparison.OrdinalIgnoreCase);
+
     public IReadOnlyList<string> ListBreakReasons()
-        => DistinctReasons(Settings.BreakReasons.Concat(HistoryBreakReasons()));
+        => DistinctReasons(Settings.BreakReasons.Concat(HistoryBreakReasons())
+            .Where(reason => !IsPresetBreakReason(reason) && !IsHiddenReason(Settings, reason)));
 
     public void RememberBreakReason(string reason)
     {
         reason = reason.Trim();
-        if (reason.Length == 0)
+        if (reason.Length == 0 || IsPresetBreakReason(reason))
             return;
 
         Settings.BreakReasons ??= [];
+        Settings.HiddenBreakReasons ??= [];
+        Settings.HiddenBreakReasons.RemoveAll(item => string.Equals(item, reason, StringComparison.OrdinalIgnoreCase));
         Settings.BreakReasons.RemoveAll(item => string.Equals(item, reason, StringComparison.OrdinalIgnoreCase));
         Settings.BreakReasons.Insert(0, reason);
         if (Settings.BreakReasons.Count > 80)
             Settings.BreakReasons.RemoveRange(80, Settings.BreakReasons.Count - 80);
+        SaveSettings(Settings);
+    }
+
+    public void ForgetBreakReason(string reason)
+    {
+        reason = reason.Trim();
+        if (reason.Length == 0 || IsPresetBreakReason(reason))
+            return;
+
+        Settings.BreakReasons ??= [];
+        Settings.HiddenBreakReasons ??= [];
+        Settings.BreakReasons.RemoveAll(item => string.Equals(item, reason, StringComparison.OrdinalIgnoreCase));
+        if (!Settings.HiddenBreakReasons.Exists(item => string.Equals(item, reason, StringComparison.OrdinalIgnoreCase)))
+            Settings.HiddenBreakReasons.Add(reason);
         SaveSettings(Settings);
     }
 
@@ -302,7 +330,15 @@ public sealed class TimeStore
         }
     }
 
-    static List<string> DistinctReasons(IEnumerable<string> reasons)
+    static bool IsHiddenReason(TrackerSettings settings, string? reason)
+    {
+        var text = reason?.Trim() ?? "";
+        if (text.Length == 0)
+            return false;
+        return settings.HiddenBreakReasons.Exists(item => string.Equals(item, text, StringComparison.OrdinalIgnoreCase));
+    }
+
+    static List<string> DistinctReasons(IEnumerable<string> reasons, int max = 80)
     {
         var result = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -312,7 +348,7 @@ public sealed class TimeStore
             if (text.Length == 0 || !seen.Add(text))
                 continue;
             result.Add(text);
-            if (result.Count >= 80)
+            if (result.Count >= max)
                 break;
         }
 

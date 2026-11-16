@@ -7,6 +7,7 @@ public sealed class TrackerSettings
     public double DailyGoalHours { get; set; } = 12;
     public bool ShowDailyOverview { get; set; }
     public List<string> BreakReasons { get; set; } = [];
+    public List<string> HiddenBreakReasons { get; set; } = [];
     public List<Project> Projects { get; set; } = [];
 
     public static TrackerSettings CreateDefault()

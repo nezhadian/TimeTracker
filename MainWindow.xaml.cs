@@ -61,4 +61,12 @@ public sealed partial class MainWindow : Window
         if (_viewModel.OpenSettingsCommand.CanExecute(null))
             _ = _viewModel.OpenSettingsCommand.ExecuteAsync(null);
     }
+
+    void RemoveBreakReason_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string reason })
+            return;
+        if (_viewModel.RemoveSavedBreakReasonCommand.CanExecute(reason))
+            _viewModel.RemoveSavedBreakReasonCommand.Execute(reason);
+    }
 }

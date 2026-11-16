@@ -31,7 +31,7 @@ public partial class MainViewModel : ObservableObject
 
     public ObservableCollection<Project> Projects { get; } = [];
 
-    public ObservableCollection<string> SavedBreakReasons { get; } = [];
+    public ObservableCollection<SavedReasonItem> SavedBreakReasons { get; } = [];
 
     public ObservableCollection<OverviewProjectItem> OverviewProjects { get; } = [];
 
@@ -261,10 +261,10 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void StartLongBreak() => StartPresetBreak(20, "Long Break");
+    void StartLongBreak() => StartPresetBreak(20, TimeStore.LongBreakReason);
 
     [RelayCommand]
-    void StartShortBreak() => StartPresetBreak(10, "Short Break");
+    void StartShortBreak() => StartPresetBreak(10, TimeStore.ShortBreakReason);
 
     [RelayCommand]
     void StartOrCancelBreak()
@@ -451,7 +451,8 @@ public partial class MainViewModel : ObservableObject
                 stoppedSeconds,
                 _store.ListBreakReasons(),
                 _store.Settings.Projects,
-                startNewSession: startNewSession || (!endingSession && _clock.IsSessionComplete));
+                startNewSession: startNewSession || (!endingSession && _clock.IsSessionComplete),
+                forgetReason: ForgetSavedBreakReason);
             if (reason?.Project is null && !string.IsNullOrWhiteSpace(reason?.Text))
             {
                 _store.RememberBreakReason(reason.Text);
@@ -803,11 +804,31 @@ public partial class MainViewModel : ObservableObject
         item.Badge = HistoryTimelineBuilder.FormatBadge(item.Date, today);
     }
 
+    [RelayCommand]
+    void RemoveSavedBreakReason(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason) || TimeStore.IsPresetBreakReason(reason))
+            return;
+
+        var typed = BreakReason;
+        ForgetSavedBreakReason(reason);
+        if (string.Equals(typed, reason.Trim(), StringComparison.OrdinalIgnoreCase))
+            BreakReason = typed;
+    }
+
+    void ForgetSavedBreakReason(string reason)
+    {
+        _store.ForgetBreakReason(reason);
+        ReloadBreakReasons();
+    }
+
     void ReloadBreakReasons()
     {
         SavedBreakReasons.Clear();
+        SavedBreakReasons.Add(SavedReasonItem.Preset(TimeStore.LongBreakReason));
+        SavedBreakReasons.Add(SavedReasonItem.Preset(TimeStore.ShortBreakReason));
         foreach (var reason in _store.ListBreakReasons())
-            SavedBreakReasons.Add(reason);
+            SavedBreakReasons.Add(SavedReasonItem.Custom(reason));
     }
 
     void SyncOverviewProjects()
@@ -906,6 +927,29 @@ public partial class MainViewModel : ObservableObject
             : _store.Settings.SessionLengthMinutes;
         return Math.Max(1, minutes) * 60;
     }
+}
+
+public sealed class SavedReasonItem
+{
+    public string Text { get; init; } = "";
+    public bool CanDelete { get; init; }
+    public bool ShowBreakBadge { get; init; }
+    public string BadgeColor { get; init; } = HistoryTimelineBuilder.BreakColor;
+
+    public override string ToString() => Text;
+
+    public static SavedReasonItem Preset(string text) => new()
+    {
+        Text = text,
+        CanDelete = false,
+        ShowBreakBadge = true
+    };
+
+    public static SavedReasonItem Custom(string text) => new()
+    {
+        Text = text,
+        CanDelete = true
+    };
 }
 
 public partial class OverviewProjectItem : ObservableObject
